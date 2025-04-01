@@ -3,15 +3,15 @@ use std::num::NonZero;
 use subsphere::{Face, Sphere, Vertex};
 
 #[test]
-fn test_icosphere_1() {
-    let sphere = subsphere::IcoSphere::new(NonZero::new(1).unwrap());
+fn test_icosphere_base() {
+    let sphere = subsphere::IcoSphere::base();
     validate_vertex_indices(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
 }
 
 #[test]
-fn test_icosphere_4() {
-    let sphere = subsphere::IcoSphere::new(NonZero::new(4).unwrap());
+fn test_icosphere_4_0() {
+    let sphere = subsphere::IcoSphere::new(NonZero::new(4).unwrap(), 0);
     validate_vertex_indices(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
 }

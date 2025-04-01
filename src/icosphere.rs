@@ -1,25 +1,48 @@
 use crate::math::{Matrix3, Scalar, Vector3, mat3, vec3};
 use std::num::NonZeroU32;
 
-/// A partition of the unit sphere into geodesic triangular [`Face`]s using an icosahedron-like
+/// A partition of the unit sphere into geodesic triangular [`Face`]s using an icosahedron
 /// subdivision scheme.
+/// 
+/// More technically, this partitions the sphere by projecting the
+/// geodesic polyhedron, `{3, 5+}_(b, c)`, onto it. The `b` and `c` parameters are as described
+/// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct IcoSphere {
-    divisions: NonZeroU32,
+    b: NonZeroU32,
 }
 
 impl IcoSphere {
-    /// Constructs an [`IcoSphere`] with the given number of subdivisions.
-    ///
-    /// The `divisions` parameters specifies how many segments each edge on the base icosahedron
-    /// should be divided into.
-    pub fn new(divisions: NonZeroU32) -> Self {
-        Self { divisions }
+    /// The base icosahedron, with no subdivisions.
+    pub const fn base() -> Self {
+        Self {
+            b: const { NonZeroU32::new(1).unwrap() },
+        }
     }
 
-    /// The number of segments each edge on the base icosahedron is divided into.
-    pub fn divisions(&self) -> NonZeroU32 {
-        self.divisions
+    /// Constructs an [`IcoSphere`] with the given subdivision parameters.
+    /// 
+    /// The `b` and `c` parameters are as described
+    /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation). Without loss of
+    /// generality, `b` is assumed to be non-zero.
+    pub fn new(b: NonZeroU32, c: u32) -> Self {
+        if c > 0 {
+            // TODO: Handle non-zero `c`
+            todo!("class II and class III geodesic polyhedra are not yet implemented");
+        }
+        Self { b }
+    }
+
+    /// The `b` parameter of this [`IcoSphere`], as described
+    /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
+    pub fn b(&self) -> NonZeroU32 {
+        self.b
+    }
+
+    /// The `c` parameter of this [`IcoSphere`], as described
+    /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
+    pub fn c(&self) -> u32 {
+        0
     }
 }
 
@@ -74,11 +97,11 @@ impl Iterator for FaceIter {
             boundary_along_v: self.boundary_along_v,
         };
         self.u_0 += 1;
-        if self.u_0 + self.v_0 >= self.sphere.divisions().get() {
+        if self.u_0 + self.v_0 >= self.sphere.b().get() {
             self.v_0 += u32::from(self.boundary_along_v);
             self.boundary_along_v = !self.boundary_along_v;
             self.u_0 = u32::from(self.boundary_along_v);
-            if self.u_0 + self.v_0 >= self.sphere.divisions().get() {
+            if self.u_0 + self.v_0 >= self.sphere.b().get() {
                 self.base += 1;
                 self.u_0 = 0;
                 self.v_0 = 0;
@@ -111,10 +134,10 @@ impl Iterator for VertexIter {
             v: self.v,
         };
         self.u += 1;
-        if self.u + self.v >= self.sphere.divisions().get() {
+        if self.u + self.v >= self.sphere.b().get() {
             self.u = u32::from(!base.owns_v_edge());
             self.v += 1;
-            while self.u + self.v >= self.sphere.divisions().get() {
+            while self.u + self.v >= self.sphere.b().get() {
                 self.base += 1;
                 if self.base as usize >= NUM_BASE_FACES {
                     break;
@@ -220,7 +243,7 @@ impl Vertex {
                     u: 0,
                     v: 0,
                 }
-            } else if v == sphere.divisions().get() {
+            } else if v == sphere.b().get() {
                 Self {
                     sphere,
                     base: base.vertex_owner(2),
@@ -242,7 +265,7 @@ impl Vertex {
                     v: 0,
                 }
             }
-        } else if u + v == sphere.divisions().get() {
+        } else if u + v == sphere.b().get() {
             if v == 0 {
                 Self {
                     sphere,
@@ -270,7 +293,7 @@ impl Vertex {
                 }
             }
         } else {
-            debug_assert!(u + v < sphere.divisions().get());
+            debug_assert!(u + v < sphere.b().get());
             Self { sphere, base, u, v }
         }
     }
@@ -281,19 +304,19 @@ impl crate::Vertex for Vertex {
     type HalfEdge = HalfEdge;
 
     fn index(&self) -> usize {
-        let divs = self.sphere.divisions().get() as usize;
+        let b = self.sphere.b().get() as usize;
         let u = self.u as usize;
         let v = self.v as usize;
         let not_owns_origin = !self.base.owns_origin() as usize;
         let not_owns_v_edge = !self.base.owns_v_edge() as usize;
-        self.base.base_vertex_index(divs) + u + v * (2 * divs - v + 1) / 2
+        self.base.base_vertex_index(b) + u + v * (2 * b - v + 1) / 2
             - not_owns_origin
             - not_owns_v_edge * v
     }
 
     fn pos(&self) -> [f64; 3] {
-        let rel_u = self.u as f64 / self.sphere.divisions().get() as f64;
-        let rel_v = self.v as f64 / self.sphere.divisions().get() as f64;
+        let rel_u = self.u as f64 / self.sphere.b().get() as f64;
+        let rel_v = self.v as f64 / self.sphere.b().get() as f64;
         let weights = [1.0 - rel_u - rel_v, rel_u, rel_v];
         let coeffs = BaseFace::interpolate(weights);
         mat3::apply(self.base.vertices_pos(), coeffs)
@@ -414,20 +437,21 @@ impl HalfEdgeDir {
     }
 }
 
-/// Represents one of the 20 faces of the base (0-subdivision) icosphere.
-///
-/// All [`Face`]s of any subdivision level belong to some [`BaseFace`].
+/// Represents one of the 20 faces of the base icosphere.
+/// 
+/// For any particular subdivision of the icosahedron, every vertex and face is "owned" by some
+/// [`BaseFace`]. This determines the order in which they are indexed/iterated.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct BaseFace(u8);
 
 impl BaseFace {
     /// Gets the index of the first vertex owned by this base face.
-    pub fn base_vertex_index(&self, divs: usize) -> usize {
+    pub fn base_vertex_index(&self, b: usize) -> usize {
         let index = self.0 as usize;
         let before_mask = (1 << index) - 1;
         (Self::OWNS_ORIGIN & before_mask).count_ones() as usize
-            + (Self::OWNS_V_EDGE & before_mask).count_ones() as usize * (divs - 1)
-            + divs * (divs - 1) * index / 2
+            + (Self::OWNS_V_EDGE & before_mask).count_ones() as usize * (b - 1)
+            + b * (b - 1) * index / 2
     }
 
     /// Gets the positions of the vertices of this base face.
