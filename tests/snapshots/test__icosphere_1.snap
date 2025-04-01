@@ -1,0 +1,7 @@
+---
+source: tests/test.rs
+assertion_line: 8
+expression: to_obj(sphere)
+extension: obj
+snapshot_kind: binary
+---
