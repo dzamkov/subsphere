@@ -19,34 +19,32 @@ pub(crate) mod vec3 {
         [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
     }
 
-    /// Subtracts `b` from `a`.
-    #[inline]
-    pub const fn sub(a: Vector3, b: Vector3) -> Vector3 {
-        [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-    }
-
     /// Multiplies a vector by a [`Scalar`].
     #[inline]
     pub const fn mul(a: Vector3, b: Scalar) -> Vector3 {
         [a[0] * b, a[1] * b, a[2] * b]
     }
 
-    /// Divides a vector by a [`Scalar`].
+    /// Computes the dot product of two vectors.
     #[inline]
-    pub const fn div(a: Vector3, b: Scalar) -> Vector3 {
-        [a[0] / b, a[1] / b, a[2] / b]
+    pub const fn dot(a: Vector3, b: Vector3) -> Scalar {
+        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    }
+
+    /// Computes the cross product of two vectors.
+    #[inline]
+    pub const fn cross(a: Vector3, b: Vector3) -> Vector3 {
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0]
+        ]
     }
 }
 
 /// Contains functions related to [`Matrix3`].
 pub(crate) mod mat3 {
     use super::*;
-
-    /// Gets the identity matrix.
-    #[inline]
-    pub const fn identity() -> Matrix3 {
-        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-    }
 
     /// Multiplies a matrix with a vector.
     #[inline]
@@ -55,5 +53,11 @@ pub(crate) mod mat3 {
         let y = vec3::mul(m[1], v[1]);
         let z = vec3::mul(m[2], v[2]);
         vec3::add(vec3::add(x, y), z)
+    }
+
+    /// Computes the determinant of a matrix.
+    #[inline]
+    pub fn det(m: Matrix3) -> Scalar {
+        vec3::dot(m[0], vec3::cross(m[1], m[2]))
     }
 }

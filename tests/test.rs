@@ -7,6 +7,7 @@ fn test_icosphere_base() {
     let sphere = subsphere::IcoSphere::base();
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    assert_eq!(area_discrepancy(sphere), 1.0);
 }
 
 #[test]
@@ -14,6 +15,7 @@ fn test_icosphere_4_0() {
     let sphere = subsphere::IcoSphere::new(NonZero::new(4).unwrap(), 0);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.1643667123353725");
 }
 
 #[test]
@@ -21,6 +23,7 @@ fn test_icosphere_3_1() {
     let sphere = subsphere::IcoSphere::new(NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.2728314137602614");
 }
 
 #[test]
@@ -28,6 +31,7 @@ fn test_icosphere_2_2() {
     let sphere = subsphere::IcoSphere::new(NonZero::new(2).unwrap(), 2);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.2111118117451836");
 }
 
 /// Validates the internal consistency of the given [`Sphere`].
@@ -47,6 +51,29 @@ fn validate(sphere: impl Sphere) {
         index += 1;
     }
     assert_eq!(index, sphere.num_vertices(), "vertex count mismatch");
+
+    // Validate total face area
+    let total_area: f64 = sphere.faces().map(|f| f.area()).sum();
+    assert!(
+        (total_area - 4.0 * std::f64::consts::PI).abs() < 1e-12,
+        "total area mismatch: expected {:?}, got {:?}",
+        4.0 * std::f64::consts::PI,
+        total_area
+    );
+}
+
+/// The area of the largest face on the given [`Sphere`] divided by the area of the smallest face.
+/// 
+/// Smaller values indicate a more uniform distribution of face areas, which is desirable.
+fn area_discrepancy(sphere: impl Sphere) -> f64 {
+    let mut min_area = f64::MAX;
+    let mut max_area = f64::MIN;
+    for f in sphere.faces() {
+        let area = f.area();
+        min_area = min_area.min(area);
+        max_area = max_area.max(area);
+    }
+    max_area / min_area
 }
 
 /// Converts the given [`Sphere`] to an OBJ file, returning the UTF-8 bytes of the file.

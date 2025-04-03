@@ -42,11 +42,9 @@ pub trait Face: Clone + Eq {
 
     /// The area of this face.
     ///
-    /// The sum of the areas of all faces on a sphere should be `4 π`.
+    /// This is also known as the [solid angle](https://en.wikipedia.org/wiki/Solid_angle)
+    /// subtended by the face. The sum of the areas of all faces on a sphere is `4 π`.
     fn area(&self) -> f64;
-
-    /// The position of the center of this face.
-    fn center(&self) -> [f64; 3];
 
     /// The number of sides (vertices or edges) that this face has.
     fn num_sides(&self) -> usize;

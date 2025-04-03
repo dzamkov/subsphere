@@ -1,4 +1,4 @@
-use crate::math::{Matrix3, Scalar, Vector3, mat3, vec3};
+use crate::math::{mat3, vec3, Scalar, Vector3};
 use std::num::NonZeroU32;
 
 /// A partition of the unit sphere into geodesic triangular [`Face`]s using an icosahedron
@@ -158,11 +158,12 @@ impl crate::Face for Face {
     }
 
     fn area(&self) -> f64 {
-        todo!()
-    }
-
-    fn center(&self) -> Vector3 {
-        todo!()
+        let [[u_0, v_0], [u_1, v_1], [u_2, v_2]] = self.local_coords();
+        let p_0 = self.sphere.project(self.region, u_0 as f64, v_0 as f64);
+        let p_1 = self.sphere.project(self.region, u_1 as f64, v_1 as f64);
+        let p_2 = self.sphere.project(self.region, u_2 as f64, v_2 as f64);
+        let d = 1.0 + vec3::dot(p_0, p_1) + vec3::dot(p_1, p_2) + vec3::dot(p_2, p_0);
+        (mat3::det([p_0, p_1, p_2]) / d).atan() * 2.0
     }
 
     fn num_sides(&self) -> usize {
@@ -180,6 +181,26 @@ impl crate::Face for Face {
             } else {
                 HalfEdgeDir::Up
             },
+        }
+    }
+}
+
+impl Face {
+    /// Gets the UV coordinates of the vertices of this face, specified in the local coordinate
+    /// space of `region`.
+    fn local_coords(&self) -> [[u32; 2]; 3] {
+        if self.boundary_along_v {
+            [
+                [self.u_0, self.v_0],
+                [self.u_0, self.v_0 + 1],
+                [self.u_0 - 1, self.v_0 + 1],
+            ]
+        } else {
+            [
+                [self.u_0, self.v_0],
+                [self.u_0 + 1, self.v_0],
+                [self.u_0, self.v_0 + 1],
+            ]
         }
     }
 }
