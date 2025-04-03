@@ -14,10 +14,16 @@ pub trait Sphere {
     /// The type of [`HalfEdge`] on this sphere.
     type HalfEdge: HalfEdge<Face = Self::Face, Vertex = Self::Vertex>;
 
+    /// The number of faces on this sphere.
+    fn num_faces(&self) -> usize;
+
     /// Iterates over the faces of this sphere.
     fn faces(&self) -> impl Iterator<Item = Self::Face>;
 
-    /// Iterates over the half-edges of this sphere.
+    /// The number of vertices on this sphere.
+    fn num_vertices(&self) -> usize;
+
+    /// Iterates over the vertices of this sphere.
     fn vertices(&self) -> impl Iterator<Item = Self::Vertex>;
 }
 

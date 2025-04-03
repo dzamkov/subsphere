@@ -5,22 +5,48 @@ use subsphere::{Face, Sphere, Vertex};
 #[test]
 fn test_icosphere_base() {
     let sphere = subsphere::IcoSphere::base();
-    validate_vertex_indices(sphere);
+    validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
 }
 
 #[test]
 fn test_icosphere_4_0() {
     let sphere = subsphere::IcoSphere::new(NonZero::new(4).unwrap(), 0);
-    validate_vertex_indices(sphere);
+    validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
 }
 
-/// Validates that [`Vertex::index`] is consistent with the [`Sphere::vertices`] iterator.
-fn validate_vertex_indices(sphere: impl Sphere) {
-    for (i, v) in sphere.vertices().enumerate() {
-        assert_eq!(v.index(), i, "vertex index mismatch");
+#[test]
+fn test_icosphere_3_1() {
+    let sphere = subsphere::IcoSphere::new(NonZero::new(3).unwrap(), 1);
+    validate(sphere);
+    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+}
+
+#[test]
+fn test_icosphere_2_2() {
+    let sphere = subsphere::IcoSphere::new(NonZero::new(2).unwrap(), 2);
+    validate(sphere);
+    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+}
+
+/// Validates the internal consistency of the given [`Sphere`].
+fn validate(sphere: impl Sphere) {
+    // Validate faces
+    let mut index = 0;
+    for f in sphere.faces() {
+        assert_eq!(f.index(), index, "face index mismatch");
+        index += 1;
     }
+    assert_eq!(index, sphere.num_faces(), "face count mismatch");
+
+    // Validate vertices
+    let mut index = 0;
+    for v in sphere.vertices() {
+        assert_eq!(v.index(), index, "vertex index mismatch");
+        index += 1;
+    }
+    assert_eq!(index, sphere.num_vertices(), "vertex count mismatch");
 }
 
 /// Converts the given [`Sphere`] to an OBJ file, returning the UTF-8 bytes of the file.

@@ -3,13 +3,14 @@ use std::num::NonZeroU32;
 
 /// A partition of the unit sphere into geodesic triangular [`Face`]s using an icosahedron
 /// subdivision scheme.
-/// 
+///
 /// More technically, this partitions the sphere by projecting the
 /// geodesic polyhedron, `{3, 5+}_(b, c)`, onto it. The `b` and `c` parameters are as described
 /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct IcoSphere {
     b: NonZeroU32,
+    c: u32,
 }
 
 impl IcoSphere {
@@ -17,32 +18,74 @@ impl IcoSphere {
     pub const fn base() -> Self {
         Self {
             b: const { NonZeroU32::new(1).unwrap() },
+            c: 0,
         }
     }
 
     /// Constructs an [`IcoSphere`] with the given subdivision parameters.
-    /// 
+    ///
     /// The `b` and `c` parameters are as described
-    /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation). Without loss of
-    /// generality, `b` is assumed to be non-zero.
+    /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation). For implementation
+    /// simplicity and performance, only `b ≥ c` polyhedra are directly supported. `b < c`
+    /// polyhedra can be emulated by simply swapping the `b` and `c` parameters and mirroring the
+    /// resulting sphere.
     pub fn new(b: NonZeroU32, c: u32) -> Self {
-        if c > 0 {
-            // TODO: Handle non-zero `c`
-            todo!("class II and class III geodesic polyhedra are not yet implemented");
-        }
-        Self { b }
+        assert!(
+            b.get() >= c,
+            "b must be greater than or equal to c. b = {}, c = {}",
+            b,
+            c
+        );
+        Self { b, c }
     }
 
     /// The `b` parameter of this [`IcoSphere`], as described
     /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
-    pub fn b(&self) -> NonZeroU32 {
-        self.b
+    pub fn b(&self) -> u32 {
+        self.b.get()
     }
 
     /// The `c` parameter of this [`IcoSphere`], as described
     /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
     pub fn c(&self) -> u32 {
-        0
+        self.c
+    }
+
+    /// The number of [`Face`]s each triangle on the base icosahedron is subdivided into.
+    ///
+    /// This is also known as the "triangulation number" of the icosphere.
+    pub fn num_divisions(&self) -> usize {
+        let b = self.b() as usize;
+        let c = self.c as usize;
+        b * (b + c) + c * c
+    }
+
+    /// The number of faces per edge [`BaseRegion`].
+    fn num_faces_per_edge_region(&self) -> usize {
+        let b = self.b() as usize;
+        let c = self.c as usize;
+        b * c * 2
+    }
+
+    /// The number of faces per interior [`BaseRegion`].
+    fn num_faces_per_interior_region(&self) -> usize {
+        let n = (self.b() - self.c) as usize;
+        n * n
+    }
+
+    /// The number of vertices per edge [`BaseRegion`], assuming that the origin vertex is not
+    /// counted.
+    fn num_vertices_per_edge_region(&self) -> usize {
+        let b = self.b() as usize;
+        let c = self.c as usize;
+        (b - 1) * (c + 1)
+    }
+
+    /// The number of vertices per interior [`BaseRegion`].
+    fn num_vertices_per_interior_region(&self) -> usize {
+        let n = (self.b() - self.c) as isize;
+        // Yes, this really should return `1` when `n = 0`.
+        ((n - 1) * (n - 2) / 2) as usize
     }
 }
 
@@ -51,102 +94,22 @@ impl crate::Sphere for IcoSphere {
     type Vertex = Vertex;
     type HalfEdge = HalfEdge;
 
+    fn num_faces(&self) -> usize {
+        self.num_divisions() * 20
+    }
+
     #[allow(refining_impl_trait)]
     fn faces(&self) -> FaceIter {
-        FaceIter {
-            sphere: *self,
-            base: 0,
-            u_0: 0,
-            v_0: 0,
-            boundary_along_v: false,
-        }
+        self.faces_from(BaseRegion::FIRST)
+    }
+
+    fn num_vertices(&self) -> usize {
+        self.num_divisions() * 10 + 2
     }
 
     #[allow(refining_impl_trait)]
     fn vertices(&self) -> VertexIter {
-        VertexIter {
-            sphere: *self,
-            base: 0,
-            u: 0,
-            v: 0,
-        }
-    }
-}
-
-/// An iterator over the faces of an [`IcoSphere`].
-pub struct FaceIter {
-    sphere: IcoSphere,
-    base: u8,
-    u_0: u32,
-    v_0: u32,
-    boundary_along_v: bool,
-}
-
-impl Iterator for FaceIter {
-    type Item = Face;
-    fn next(&mut self) -> Option<Face> {
-        if self.base as usize >= NUM_BASE_FACES {
-            return None;
-        }
-        let base = BaseFace(self.base);
-        let res = Face {
-            sphere: self.sphere,
-            base,
-            u_0: self.u_0,
-            v_0: self.v_0,
-            boundary_along_v: self.boundary_along_v,
-        };
-        self.u_0 += 1;
-        if self.u_0 + self.v_0 >= self.sphere.b().get() {
-            self.v_0 += u32::from(self.boundary_along_v);
-            self.boundary_along_v = !self.boundary_along_v;
-            self.u_0 = u32::from(self.boundary_along_v);
-            if self.u_0 + self.v_0 >= self.sphere.b().get() {
-                self.base += 1;
-                self.u_0 = 0;
-                self.v_0 = 0;
-                self.boundary_along_v = false;
-            }
-        }
-        Some(res)
-    }
-}
-
-/// An iterator over the vertices of an [`IcoSphere`].
-pub struct VertexIter {
-    sphere: IcoSphere,
-    base: u8,
-    u: u32,
-    v: u32,
-}
-
-impl Iterator for VertexIter {
-    type Item = Vertex;
-    fn next(&mut self) -> Option<Vertex> {
-        if self.base as usize >= NUM_BASE_FACES {
-            return None;
-        }
-        let base = BaseFace(self.base);
-        let res = Vertex {
-            sphere: self.sphere,
-            base,
-            u: self.u,
-            v: self.v,
-        };
-        self.u += 1;
-        if self.u + self.v >= self.sphere.b().get() {
-            self.u = u32::from(!base.owns_v_edge());
-            self.v += 1;
-            while self.u + self.v >= self.sphere.b().get() {
-                self.base += 1;
-                if self.base as usize >= NUM_BASE_FACES {
-                    break;
-                }
-                self.u = u32::from(!BaseFace(self.base).owns_origin());
-                self.v = 0;
-            }
-        }
-        Some(res)
+        self.vertices_from(BaseRegion::FIRST)
     }
 }
 
@@ -157,13 +120,15 @@ impl Iterator for VertexIter {
 pub struct Face {
     sphere: IcoSphere,
 
-    /// The [`BaseFace`] this face belongs to.
-    base: BaseFace,
+    /// The [`BaseRegion`] which "owns" this face.
+    region: BaseRegion,
 
-    /// The U coordinate of the first vertex of this face on `base`.
+    /// The U coordinate of the first vertex of this face, specified in the local coordinate space
+    /// of `region`.
     u_0: u32,
 
-    /// The V coordinate of the first vertex of this face on `base`.
+    /// The U coordinate of the first vertex of this face, specified in the local coordinate space
+    /// of `region`.
     v_0: u32,
 
     /// If `true`, the first [`HalfEdge`] boundary of this face will go in the +V direction.
@@ -176,7 +141,20 @@ impl crate::Face for Face {
     type HalfEdge = HalfEdge;
 
     fn index(&self) -> usize {
-        todo!()
+        if self.region.ty().is_edge() {
+            self.sphere.base_face_index(self.region)
+                + (2 * self.v_0 as usize + self.boundary_along_v as usize)
+                    * self.sphere.b() as usize
+                + self.u_0 as usize
+                - self.boundary_along_v as usize
+        } else {
+            let n = (self.sphere.b() - self.sphere.c) as usize;
+            self.sphere.base_face_index(self.region)
+                + self.v_0 as usize * n * 2
+                + self.boundary_along_v as usize * (n - self.v_0 as usize - 1)
+                - self.v_0 as usize * self.v_0 as usize
+                + self.u_0 as usize
+        }
     }
 
     fn area(&self) -> f64 {
@@ -194,7 +172,7 @@ impl crate::Face for Face {
     fn first_boundary(&self) -> HalfEdge {
         HalfEdge {
             sphere: self.sphere,
-            base: self.base,
+            region: self.region,
             start_u: self.u_0,
             start_v: self.v_0,
             dir: if self.boundary_along_v {
@@ -211,90 +189,206 @@ impl crate::Face for Face {
 pub struct Vertex {
     sphere: IcoSphere,
 
-    /// The [`BaseFace`] which "owns" this vertex.
-    ///
-    /// The order that vertices are indexed/iterated is determined by their "owning" base face.
-    /// Each base face:
-    ///   * Sometimes owns its local origin vertex (the vertex at `U = 0` and `V = 0`).
-    ///   * Always owns the vertices along its U edge (i.e. vertices with  `U = 1..` and `V = 0`).
-    ///   * Sometimes owns the vertices along its V edge (i.e. vertices with `U = 0` and `V = 1..`).
-    ///   * Never owns the vertices along its far edge (i.e. vertices with `U + V = N`).
-    ///   * Always owns the vertices in its interior (i.e. vertices with `U > 0`, `V > 0` and
-    ///     `U + V < N`).
-    base: BaseFace,
+    /// The [`BaseRegion`] which "owns" this vertex.
+    region: BaseRegion,
 
-    /// The U coordinate of this vertex on `base`.
+    /// The U coordinate of this vertex, specified in the local coordinate space of `region`.
     u: u32,
 
-    /// The V coordinate of this vertex on `base`.
+    /// The V coordinate of this vertex, specified in the local coordinate space of `region`.
     v: u32,
 }
 
 impl Vertex {
     /// Constructs a [`Vertex`] with the given properties.
     ///
-    /// This will normalize the vertex `base` to be its proper owner.
-    fn new(sphere: IcoSphere, base: BaseFace, u: u32, v: u32) -> Self {
-        if u == 0 {
-            if v == 0 {
-                Self {
-                    sphere,
-                    base: base.vertex_owner(0),
-                    u: 0,
-                    v: 0,
-                }
-            } else if v == sphere.b().get() {
-                Self {
-                    sphere,
-                    base: base.vertex_owner(2),
-                    u: 0,
-                    v: 0,
-                }
-            } else if base.owns_v_edge() {
-                Self { sphere, base, u, v }
-            } else {
-                let (adj, adj_index) = base.adjacent(2);
-
-                // With the current configuration of the base icosahedron. Every base face which
-                // doesn't own its V edge is adjacent to the U edge of the base face that does.
-                debug_assert_eq!(adj_index, 0);
-                Self {
-                    sphere,
-                    base: adj,
-                    u: v,
-                    v: 0,
-                }
-            }
-        } else if u + v == sphere.b().get() {
-            if v == 0 {
-                Self {
-                    sphere,
-                    base: base.vertex_owner(1),
-                    u: 0,
-                    v: 0,
-                }
-            } else {
-                let (adj, adj_index) = base.adjacent(1);
-                if adj_index == 0 {
-                    Self {
-                        sphere,
-                        base: adj,
-                        u,
-                        v: 0,
+    /// This will normalize the vertex `region` to be its proper owner.
+    fn new(sphere: IcoSphere, region: BaseRegion, u: u32, v: u32) -> Self {
+        if region.ty().is_edge() {
+            if u == 0 {
+                if v == 0 {
+                    Self::base(sphere, region.owner().vertex_owner(0))
+                } else if v == sphere.c && sphere.b() == sphere.c {
+                    if region.ty() == BaseRegionType::Edge0 {
+                        Self::center(sphere, region.owner())
+                    } else {
+                        Self::center(sphere, region.owner().adjacent(2).0)
+                    }
+                } else if region.owner().owns_edge_2() {
+                    if region.ty() == BaseRegionType::Edge0 {
+                        Self {
+                            sphere,
+                            region: BaseRegion::new(region.owner(), BaseRegionType::Edge2),
+                            u: v,
+                            v: 0,
+                        }
+                    } else {
+                        let (adj, adj_index) = region.owner().adjacent(2);
+                        debug_assert_eq!(adj_index, 1);
+                        Self {
+                            sphere,
+                            region: BaseRegion::new(adj, BaseRegionType::Edge0),
+                            u: sphere.b() - v,
+                            v: sphere.c,
+                        }
                     }
                 } else {
-                    debug_assert_eq!(adj_index, 2);
+                    debug_assert_eq!(region.ty(), BaseRegionType::Edge0);
+                    let (adj, adj_index) = region.owner().adjacent(2);
+
+                    // With the current base layout, if a base face doesn't own its edge 2,
+                    // it will be the edge 0 of the adjacent face that owns it.
+                    debug_assert_eq!(adj_index, 0);
                     Self {
                         sphere,
-                        base: adj,
-                        u: 0,
-                        v,
+                        region: BaseRegion::new(adj, BaseRegionType::Edge0),
+                        u: v,
+                        v: 0,
                     }
+                }
+            } else if u == sphere.b() {
+                if v == 0 && sphere.b() == sphere.c {
+                    if region.ty() == BaseRegionType::Edge0 {
+                        Self::center(sphere, region.owner().adjacent(0).0)
+                    } else {
+                        Self::center(sphere, region.owner())
+                    }
+                } else if region.ty() == BaseRegionType::Edge0 {
+                    if v == sphere.c {
+                        Self::base(sphere, region.owner().vertex_owner(1))
+                    } else {
+                        let (adj, adj_index) = region.owner().adjacent(0);
+                        if adj_index == 1 {
+                            Self {
+                                sphere,
+                                region: BaseRegion::new(adj, BaseRegionType::Edge0),
+                                u: sphere.b() - sphere.c + v,
+                                v: sphere.c,
+                            }
+                        } else {
+                            debug_assert_eq!(adj_index, 2);
+                            Self::adjacent_1(sphere, adj, (sphere.b() - sphere.c) + v)
+                        }
+                    }
+                } else if v == sphere.c {
+                    Self::base(sphere, region.owner().vertex_owner(2))
+                } else {
+                    Self::adjacent_1(sphere, region.owner(), (sphere.b() - sphere.c) + v)
+                }
+            } else {
+                Self {
+                    sphere,
+                    region,
+                    u,
+                    v,
                 }
             }
         } else {
-            debug_assert!(u + v < sphere.b().get());
-            Self { sphere, base, u, v }
+            let n = sphere.b() - sphere.c;
+            if u + v >= n {
+                debug_assert_eq!(u + v, n);
+                if n == 0 {
+                    todo!()
+                } else if v == 0 {
+                    if sphere.c == 0 {
+                        Self::base(sphere, region.owner().vertex_owner(1))
+                    } else {
+                        Self {
+                            sphere,
+                            region: BaseRegion::new(region.owner(), BaseRegionType::Edge0),
+                            u,
+                            v: sphere.c,
+                        }
+                    }
+                } else if u == 0 && sphere.c == 0 {
+                    Self::base(sphere, region.owner().vertex_owner(2))
+                } else {
+                    Self::adjacent_1(sphere, region.owner(), v)
+                }
+            } else if u == 0 {
+                if v == 0 && sphere.c == 0 {
+                    Self::base(sphere, region.owner().vertex_owner(0))
+                } else {
+                    let region = if region.owner().owns_edge_2() {
+                        BaseRegion::new(region.owner(), BaseRegionType::Edge2)
+                    } else {
+                        let (adj, adj_index) = region.owner().adjacent(2);
+
+                        // With the current base layout, if a base face doesn't own its edge 2,
+                        // it will be the edge 0 of the adjacent face that owns it.
+                        debug_assert_eq!(adj_index, 0);
+                        BaseRegion::new(adj, BaseRegionType::Edge0)
+                    };
+                    Self {
+                        sphere,
+                        region,
+                        u: sphere.c + v,
+                        v: 0,
+                    }
+                }
+            } else if v == 0 {
+                Self {
+                    sphere,
+                    region: BaseRegion::new(region.owner(), BaseRegionType::Edge0),
+                    u,
+                    v: sphere.c,
+                }
+            } else {
+                Self {
+                    sphere,
+                    region,
+                    u,
+                    v,
+                }
+            }
+        }
+    }
+
+    /// Constructs a [`Vertex`] on the edge 1 border of the given [`BaseFace`].
+    ///
+    /// `r` is the height of the vertex above `face`'s vertex 1. The caller must ensure
+    /// `0 < r < b`.
+    fn adjacent_1(sphere: IcoSphere, face: BaseFace, r: u32) -> Self {
+        let (adj, adj_index) = face.adjacent(1);
+        if adj_index == 0 {
+            Self {
+                sphere,
+                region: BaseRegion::new(adj, BaseRegionType::Edge0),
+                u: sphere.b() - r,
+                v: 0,
+            }
+        } else {
+            debug_assert_eq!(adj_index, 2);
+            Self {
+                sphere,
+                region: BaseRegion::new(adj, BaseRegionType::Edge2),
+                u: r,
+                v: sphere.c,
+            }
+        }
+    }
+
+    /// Gets the [`Vertex`] at the center of the given [`BaseFace`].
+    ///
+    /// This is only possible when `b == c`.
+    fn center(sphere: IcoSphere, face: BaseFace) -> Self {
+        debug_assert_eq!(sphere.b(), sphere.c);
+        Self {
+            sphere,
+            region: BaseRegion::new(face, BaseRegionType::Interior),
+            u: 0,
+            v: 0,
+        }
+    }
+
+    /// Constructs a [`Vertex`] for one of the 12 base vertices, identified by its owning
+    /// [`BaseFace`].
+    const fn base(sphere: IcoSphere, owner: BaseFace) -> Self {
+        Self {
+            sphere,
+            region: BaseRegion::new(owner, BaseRegionType::Edge0),
+            u: 0,
+            v: 0,
         }
     }
 }
@@ -304,22 +398,26 @@ impl crate::Vertex for Vertex {
     type HalfEdge = HalfEdge;
 
     fn index(&self) -> usize {
-        let b = self.sphere.b().get() as usize;
-        let u = self.u as usize;
-        let v = self.v as usize;
-        let not_owns_origin = !self.base.owns_origin() as usize;
-        let not_owns_v_edge = !self.base.owns_v_edge() as usize;
-        self.base.base_vertex_index(b) + u + v * (2 * b - v + 1) / 2
-            - not_owns_origin
-            - not_owns_v_edge * v
+        if self.region.ty().is_edge() {
+            let owns_origin =
+                self.region.owner().owns_vertex_0() && self.region.ty() == BaseRegionType::Edge0;
+            self.sphere.base_vertex_index(self.region)
+                + self.v as usize * (self.sphere.b() as usize - 1)
+                + self.u as usize
+                - !owns_origin as usize
+        } else if self.sphere.c < self.sphere.b() {
+            let n = (self.sphere.b() - self.sphere.c) as usize;
+            self.sphere.base_vertex_index(self.region)
+                + (self.v as usize - 1) * (2 * n - self.v as usize - 2) / 2
+                + (self.u as usize - 1)
+        } else {
+            self.sphere.base_vertex_index(self.region)
+        }
     }
 
     fn pos(&self) -> [f64; 3] {
-        let rel_u = self.u as f64 / self.sphere.b().get() as f64;
-        let rel_v = self.v as f64 / self.sphere.b().get() as f64;
-        let weights = [1.0 - rel_u - rel_v, rel_u, rel_v];
-        let coeffs = BaseFace::interpolate(weights);
-        mat3::apply(self.base.vertices_pos(), coeffs)
+        self.sphere
+            .project(self.region, self.u as f64, self.v as f64)
     }
 
     fn degree(&self) -> usize {
@@ -336,13 +434,13 @@ impl crate::Vertex for Vertex {
 pub struct HalfEdge {
     sphere: IcoSphere,
 
-    /// The [`BaseFace`] this face belongs to.
-    base: BaseFace,
+    /// The [`BaseRegion`] which "owns" this half-edge.
+    region: BaseRegion,
 
-    /// The U coordinate of the start vertex on `base`.
+    /// The U coordinate of the start vertex, specified in the local coordinate space of `region`.
     start_u: u32,
 
-    /// The V coordinate of the start vertex on `base`.
+    /// The V coordinate of the start vertex, specified in the local coordinate space of `region`.
     start_v: u32,
 
     /// The direction of this half-edge.
@@ -381,7 +479,7 @@ impl crate::HalfEdge for HalfEdge {
     }
 
     fn start(&self) -> Vertex {
-        Vertex::new(self.sphere, self.base, self.start_u, self.start_v)
+        Vertex::new(self.sphere, self.region, self.start_u, self.start_v)
     }
 
     fn complement(&self) -> HalfEdge {
@@ -399,7 +497,7 @@ impl crate::HalfEdge for HalfEdge {
         let dir = self.dir.rotate_ccw_120();
         HalfEdge {
             sphere: self.sphere,
-            base: self.base,
+            region: self.region,
             start_u,
             start_v,
             dir,
@@ -438,22 +536,13 @@ impl HalfEdgeDir {
 }
 
 /// Represents one of the 20 faces of the base icosphere.
-/// 
+///
 /// For any particular subdivision of the icosahedron, every vertex and face is "owned" by some
 /// [`BaseFace`]. This determines the order in which they are indexed/iterated.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct BaseFace(u8);
 
 impl BaseFace {
-    /// Gets the index of the first vertex owned by this base face.
-    pub fn base_vertex_index(&self, b: usize) -> usize {
-        let index = self.0 as usize;
-        let before_mask = (1 << index) - 1;
-        (Self::OWNS_ORIGIN & before_mask).count_ones() as usize
-            + (Self::OWNS_V_EDGE & before_mask).count_ones() as usize * (b - 1)
-            + b * (b - 1) * index / 2
-    }
-
     /// Gets the positions of the vertices of this base face.
     pub fn vertices_pos(&self) -> [Vector3; 3] {
         unsafe {
@@ -555,34 +644,34 @@ impl BaseFace {
         table
     };
 
-    /// Indicates whether this face [owns](Vertex::base) the vertex at its local origin (i.e. the
-    /// vertex with `U = 0` and `V = 0`).
-    pub fn owns_origin(self) -> bool {
-        (Self::OWNS_ORIGIN >> self.0) & 1 == 1
+    /// Indicates whether this face "owns" its first vertex.
+    ///
+    /// This is the only vertex which may be owned by the base face.
+    pub fn owns_vertex_0(self) -> bool {
+        (Self::OWNS_VERTEX_0 >> self.0) & 1 == 1
     }
 
     /// Bitset used to implement [`Self::owns_origin`].
-    const OWNS_ORIGIN: u32 = const {
-        let mut owns_origin = 0;
+    const OWNS_VERTEX_0: u32 = const {
+        let mut owns_vertex_0 = 0;
         let mut i = 0;
         while i < NUM_BASE_FACES {
             if Self::VERTEX_OWNER[i][0].0 as usize == i {
-                owns_origin |= 1 << i;
+                owns_vertex_0 |= 1 << i;
             }
             i += 1;
         }
-        owns_origin
+        owns_vertex_0
     };
 
-    /// Indicates whether this face [owns](Vertex::base) the vertices along its V edge (i.e.
-    /// vertices with `U = 0` and `V = 1..`).
-    pub fn owns_v_edge(self) -> bool {
-        (Self::OWNS_V_EDGE >> self.0) & 1 == 1
+    /// Indicates whether this face "owns" the region corresponding to its second edge.
+    pub fn owns_edge_2(self) -> bool {
+        (Self::OWNS_EDGE_2 >> self.0) & 1 == 1
     }
 
-    /// Bitset used to implement [`Self::owns_v_edge`].
-    const OWNS_V_EDGE: u32 = const {
-        // Assign ownership of each edge. First by U edge, then optionally by V edge.
+    /// Bitset used to implement [`Self::owns_edge_2`].
+    const OWNS_EDGE_2: u32 = const {
+        // Assign ownership of each edge. First by edge 0, then optionally by edge 2.
         let mut edge_has_owner: [bool; NUM_BASE_VERTS * NUM_BASE_VERTS] =
             [false; NUM_BASE_VERTS * NUM_BASE_VERTS];
         let mut num_owned_edges = 0;
@@ -590,30 +679,30 @@ impl BaseFace {
         while i < NUM_BASE_FACES {
             let v_0 = BASE_INDICES[i][0] as usize;
             let v_1 = BASE_INDICES[i][1] as usize;
-            let edge = if v_0 < v_1 {
+            let edge_0 = if v_0 < v_1 {
                 v_0 * NUM_BASE_VERTS + v_1
             } else {
                 v_1 * NUM_BASE_VERTS + v_0
             };
-            assert!(!edge_has_owner[edge], "edge already has an owner");
-            edge_has_owner[edge] = true;
+            assert!(!edge_has_owner[edge_0], "edge already has an owner");
+            edge_has_owner[edge_0] = true;
             num_owned_edges += 1;
             i += 1;
         }
-        let mut owns_v_edge = 0;
+        let mut owns_edge_2 = 0;
         let mut i = 0;
         while i < NUM_BASE_FACES {
             let v_2 = BASE_INDICES[i][2] as usize;
             let v_0 = BASE_INDICES[i][0] as usize;
-            let edge = if v_0 < v_2 {
+            let edge_2 = if v_0 < v_2 {
                 v_0 * NUM_BASE_VERTS + v_2
             } else {
                 v_2 * NUM_BASE_VERTS + v_0
             };
-            if !edge_has_owner[edge] {
-                edge_has_owner[edge] = true;
+            if !edge_has_owner[edge_2] {
+                edge_has_owner[edge_2] = true;
                 num_owned_edges += 1;
-                owns_v_edge |= 1 << i;
+                owns_edge_2 |= 1 << i;
             }
             i += 1;
         }
@@ -623,7 +712,7 @@ impl BaseFace {
             num_owned_edges == NUM_BASE_EDGES,
             "not all edges have an owner"
         );
-        owns_v_edge
+        owns_edge_2
     };
 
     /// Interpolation function for a base face.
@@ -668,6 +757,321 @@ impl BaseFace {
 
         /// Angle between two adjacent vertices of the base icosahedron.
         const ANGLE: Scalar = 1.1071487177940904;
+    }
+}
+
+/// Represents one of the 50 "regions" on an icosphere.
+///
+/// There is a region corresponding to every base face and base edge. Each region defines a local
+/// UV coordinate space, shaped like a parallelogram for edges, and a triangle for faces.
+///
+/// Every base region is "owned" by exactly one base face. Base faces always own the region
+/// corresponding to their first edge, their interior, and possibly the region corresponding to
+/// their third edge.
+///
+/// Every vertex, face and half-edge is "owned" by exactly one base region.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct BaseRegion(u8);
+
+impl BaseRegion {
+    /// The first [`BaseRegion`].
+    pub const FIRST: BaseRegion = BaseRegion(0);
+
+    /// Gets the [`BaseRegion`] with the given owner and type.
+    pub const fn new(owner: BaseFace, ty: BaseRegionType) -> Self {
+        BaseRegion((owner.0 << 2) | (ty as u8))
+    }
+
+    /// The [`BaseFace`] which owns this region.
+    pub const fn owner(self) -> BaseFace {
+        BaseFace(self.0 >> 2)
+    }
+
+    /// The type of this region.
+    pub const fn ty(self) -> BaseRegionType {
+        unsafe { std::mem::transmute(self.0 & 3) }
+    }
+}
+
+/// The general type of a [`BaseRegion`].
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum BaseRegionType {
+    /// Corresponds to the first edge of [`BaseRegion::owner`].
+    Edge0 = 0,
+
+    /// Corresponds to the interior of [`BaseRegion::owner`].
+    Interior = 1,
+
+    /// Corresponds to the third edge of [`BaseRegion::owner`].
+    Edge2 = 3,
+}
+
+impl BaseRegionType {
+    /// Indicates whether this region corresponds to an edge.
+    fn is_edge(self) -> bool {
+        self != Self::Interior
+    }
+}
+
+impl IcoSphere {
+    /// Gets the index of the first face which is owned by the given base region.
+    fn base_face_index(&self, region: BaseRegion) -> usize {
+        let face = region.owner();
+        let before_mask = (1 << face.0) - 1;
+        let num_edge_regions_before = face.0 as usize
+            + (BaseFace::OWNS_EDGE_2 & before_mask).count_ones() as usize
+            + (region.ty() > BaseRegionType::Edge0) as usize;
+        let num_interior_regions_before =
+            face.0 as usize + (region.ty() > BaseRegionType::Interior) as usize;
+        num_edge_regions_before * self.num_faces_per_edge_region()
+            + num_interior_regions_before * self.num_faces_per_interior_region()
+    }
+
+    /// Gets the index of the first vertex which is owned by the given base region.
+    fn base_vertex_index(&self, region: BaseRegion) -> usize {
+        let face = region.owner();
+        let before_mask = (1 << face.0) - 1;
+        let num_origin_vertices_before = (BaseFace::OWNS_VERTEX_0 & before_mask).count_ones()
+            as usize
+            + (face.owns_vertex_0() && region.ty() > BaseRegionType::Edge0) as usize;
+        let num_edge_regions_before = face.0 as usize
+            + (BaseFace::OWNS_EDGE_2 & before_mask).count_ones() as usize
+            + (region.ty() > BaseRegionType::Edge0) as usize;
+        let num_interior_regions_before =
+            face.0 as usize + (region.ty() > BaseRegionType::Interior) as usize;
+        num_origin_vertices_before
+            + num_edge_regions_before * self.num_vertices_per_edge_region()
+            + num_interior_regions_before * self.num_vertices_per_interior_region()
+    }
+
+    /// Projects a point in the local coordinate space of this region to a point on the unit
+    /// sphere.
+    fn project(&self, region: BaseRegion, u: f64, v: f64) -> Vector3 {
+        let b = self.b() as f64;
+        let c = self.c as f64;
+        let norm_sqr = b * b + b * c + c * c;
+        let (face, weights) = if region.ty().is_edge() {
+            let w_left = (v * b - u * c) / norm_sqr;
+            if region.ty() == BaseRegionType::Edge0 {
+                if w_left >= 0.0 {
+                    let w_1 = (u * b + (u + v) * c) / norm_sqr;
+                    let w_2 = w_left;
+                    (region.owner(), [1.0 - w_1 - w_2, w_1, w_2])
+                } else {
+                    let (adj, adj_index) = region.owner().adjacent(0);
+                    let w_2 = -w_left;
+                    let w_0 = ((u + v) * b + v * c) / norm_sqr;
+                    let w_1 = 1.0 - w_0 - w_2;
+                    let mut weights = [w_0, w_1, w_2];
+                    weights.rotate_right(adj_index as usize);
+                    (adj, weights)
+                }
+            } else if w_left <= 0.0 {
+                let w_1 = -w_left;
+                let w_2 = ((u + v) * b + v * c) / norm_sqr;
+                (region.owner(), [1.0 - w_1 - w_2, w_1, w_2])
+            } else {
+                let (adj, adj_index) = region.owner().adjacent(2);
+                let w_1 = (u * b + (u + v) * c) / norm_sqr;
+                let w_2 = w_left;
+                let w_0 = 1.0 - w_1 - w_2;
+                let mut weights = [w_0, w_1, w_2];
+                weights.rotate_right(adj_index as usize);
+                (adj, weights)
+            }
+        } else {
+            let v = v + c;
+            let w_1 = (u * b + (u + v) * c) / norm_sqr;
+            let w_2 = (v * b - u * c) / norm_sqr;
+            (region.owner(), [1.0 - w_1 - w_2, w_1, w_2])
+        };
+        mat3::apply(face.vertices_pos(), BaseFace::interpolate(weights))
+    }
+}
+
+impl IcoSphere {
+    /// Iterates over the faces of this [`IcoSphere`], starting with the given region.
+    fn faces_from(&self, region: BaseRegion) -> FaceIter {
+        if region.ty().is_edge() {
+            // If `c` is zero, there are no faces in an edge region. This iterator should
+            // immediately go to the next region.
+            FaceIter {
+                sphere: *self,
+                region,
+                u_0: 0,
+                u_0_end: self.b() * (self.c > 0) as u32,
+                v_0: 0,
+                boundary_along_v: self.c == 0,
+            }
+        } else {
+            let n = self.b() - self.c;
+            FaceIter {
+                sphere: *self,
+                region,
+                u_0: 0,
+                u_0_end: n,
+                v_0: 0,
+                boundary_along_v: false,
+            }
+        }
+    }
+}
+
+/// An iterator over the faces of an [`IcoSphere`].
+pub struct FaceIter {
+    sphere: IcoSphere,
+    region: BaseRegion,
+    u_0: u32,
+    u_0_end: u32,
+    v_0: u32,
+    boundary_along_v: bool,
+}
+
+impl Iterator for FaceIter {
+    type Item = Face;
+    fn next(&mut self) -> Option<Face> {
+        loop {
+            let next_region;
+            if self.u_0 < self.u_0_end {
+                let res = Face {
+                    sphere: self.sphere,
+                    region: self.region,
+                    u_0: self.u_0,
+                    v_0: self.v_0,
+                    boundary_along_v: self.boundary_along_v,
+                };
+                self.u_0 += 1;
+                return Some(res);
+            } else if self.region.ty().is_edge() {
+                if !self.boundary_along_v {
+                    self.u_0 = 1;
+                    self.u_0_end = self.sphere.b() + 1;
+                    self.boundary_along_v = true;
+                    continue;
+                } else if self.v_0 + 1 < self.sphere.c {
+                    self.v_0 += 1;
+                    self.u_0 = 0;
+                    self.u_0_end = self.sphere.b();
+                    self.boundary_along_v = false;
+                    continue;
+                } else {
+                    next_region = self.region.0 + 1;
+                }
+            } else if !self.boundary_along_v {
+                self.u_0 = 1;
+                self.boundary_along_v = true;
+                continue;
+            } else {
+                let n = self.sphere.b() - self.sphere.c;
+                if self.v_0 + 1 < n {
+                    self.v_0 += 1;
+                    self.u_0 = 0;
+                    self.u_0_end = n - self.v_0;
+                    self.boundary_along_v = false;
+                    continue;
+                } else if self.region.owner().owns_edge_2() {
+                    next_region = self.region.0 + 2;
+                } else {
+                    next_region = self.region.0 + 3;
+                }
+            }
+            if (next_region as usize) < NUM_BASE_FACES << 2 {
+                *self = self.sphere.faces_from(BaseRegion(next_region));
+                continue;
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
+impl IcoSphere {
+    /// Iterates over the vertices of this [`IcoSphere`], starting with the given region.
+    fn vertices_from(&self, region: BaseRegion) -> VertexIter {
+        if region.ty().is_edge() {
+            let has_origin = region.owner().owns_vertex_0() && region.ty() == BaseRegionType::Edge0;
+            VertexIter {
+                sphere: *self,
+                region,
+                u: !has_origin as u32,
+                u_end: self.b(),
+                v: 0,
+            }
+        } else if self.c < self.b() {
+            let n = self.b() - self.c;
+            VertexIter {
+                sphere: *self,
+                region,
+                u: 1,
+                u_end: n - 1,
+                v: 1,
+            }
+        } else {
+            // This is a special case. When `b == c` there is exactly one interior vertex,
+            // at (0, 0).
+            VertexIter {
+                sphere: *self,
+                region,
+                u: 0,
+                u_end: 1,
+                v: 0,
+            }
+        }
+    }
+}
+
+/// An iterator over the vertices of an [`IcoSphere`].
+pub struct VertexIter {
+    sphere: IcoSphere,
+    region: BaseRegion,
+    u: u32,
+    u_end: u32,
+    v: u32,
+}
+
+impl Iterator for VertexIter {
+    type Item = Vertex;
+    fn next(&mut self) -> Option<Vertex> {
+        loop {
+            let next_region;
+            if self.u < self.u_end {
+                let res = Vertex {
+                    sphere: self.sphere,
+                    region: self.region,
+                    u: self.u,
+                    v: self.v,
+                };
+                self.u += 1;
+                return Some(res);
+            } else if self.region.ty().is_edge() {
+                if self.v < self.sphere.c {
+                    self.v += 1;
+                    self.u = 1;
+                    continue;
+                } else {
+                    next_region = self.region.0 + 1;
+                }
+            } else {
+                let n = self.sphere.b() - self.sphere.c;
+                if self.v + 1 < n {
+                    self.v += 1;
+                    self.u = 1;
+                    self.u_end = n - self.v;
+                    continue;
+                } else if self.region.owner().owns_edge_2() {
+                    next_region = self.region.0 + 2;
+                } else {
+                    next_region = self.region.0 + 3;
+                }
+            }
+            if (next_region as usize) < NUM_BASE_FACES << 2 {
+                *self = self.sphere.vertices_from(BaseRegion(next_region));
+                continue;
+            } else {
+                return None;
+            }
+        }
     }
 }
 
