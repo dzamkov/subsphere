@@ -18,7 +18,19 @@ pub struct SubTriSphere<Base: BaseSphere> {
 }
 
 /// Describes a potential base shape for a [`SubTriSphere`].
-///
+/// 
+/// This is a [`crate::Sphere`] with equilateral triangular faces. There are effectively
+/// three topologically distinct implementations of this trait:
+///  * `BaseTetraSphere` (**TODO**)
+///  * `BaseOctoSphere` (**TODO**)
+///  * [`BaseIcoSphere`](crate::ico::BaseIcoSphere)
+#[allow(private_bounds)]
+pub trait BaseSphere: crate::Sphere + Eq + Clone + BaseSphereInternal {
+
+}
+
+/// Internal trait for [`BaseSphere`].
+/// 
 /// This is a [`crate::Sphere`] whose faces are triangular, which also assigns an "owner" (face) to
 /// each vertex and edge, subject to the following rules:
 ///  * Every vertex and edge is owned by exactly one face.
@@ -26,7 +38,7 @@ pub struct SubTriSphere<Base: BaseSphere> {
 ///  * Faces must not own their second edge.
 ///  * Faces may own their third edge.
 ///  * Faces may only own their first vertex.
-pub trait BaseSphere: crate::Sphere + Eq + Clone {
+pub(crate) trait BaseSphereInternal: crate::Sphere + Eq + Clone {
     /// The type of [`BaseRegion`] for this base shape.
     type Region: BaseRegion<Face = Self::Face>;
 
@@ -97,15 +109,27 @@ impl BaseRegionType {
     }
 }
 
-impl<Base: BaseSphere> SubTriSphere<Base> {
-    /// Constructs a [`SubTriSphere`] by subdividing the given base shape.
+impl<Base: BaseSphere + Default> SubTriSphere<Base> {
+    /// Constructs a [`SubTriSphere`] wrapper over the base shape, without any subdivision.
+    pub fn base() -> Self {
+        Self::new_internal(Base::default(), NonZeroU32::new(1).unwrap(), 0)
+    }
+
+    /// Constructs a [`SubTriSphere`] with the given subdivision parameters.
     ///
     /// The `b` and `c` parameters are as described
     /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation). For implementation
     /// simplicity and performance, only `b ≥ c` polyhedra are directly supported. `b < c`
     /// polyhedra can be emulated by simply swapping the `b` and `c` parameters and mirroring the
     /// resulting sphere.
-    pub fn from_base(base: Base, b: NonZeroU32, c: u32) -> Self {
+    pub fn new(b: NonZeroU32, c: u32) -> Self {
+        Self::new_internal(Base::default(), b, c)
+    }
+}
+
+impl<Base: BaseSphere> SubTriSphere<Base> {
+    /// Constructs a [`SubTriSphere`] by subdividing the given base shape.
+    pub(crate) fn new_internal(base: Base, b: NonZeroU32, c: u32) -> Self {
         assert!(
             b.get() >= c,
             "b must be greater than or equal to c. b = {}, c = {}",

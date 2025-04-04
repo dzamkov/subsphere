@@ -2,9 +2,9 @@
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 mod math;
+mod statictri;
 
 pub mod ico;
-pub mod statictri;
 pub mod subtri;
 
 pub use subtri::SubTriSphere;

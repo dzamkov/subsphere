@@ -1,29 +1,10 @@
 //! Contains types related to the [`IcoSphere`] tessellation.
 use crate::statictri::{self, StaticTriSphere};
 use crate::subtri::{self, SubTriSphere};
-use std::num::NonZeroU32;
 
 /// A tessellation of the unit sphere into geodesic triangular [`Face`]s constructed by
 /// subdividing an icosahedron.
 pub type IcoSphere = SubTriSphere<BaseIcoSphere>;
-
-impl IcoSphere {
-    /// The base icosahedron.
-    pub fn base() -> Self {
-        Self::from_base(BaseIcoSphere, NonZeroU32::new(1).unwrap(), 0)
-    }
-
-    /// Constructs a [`IcoSphere`] with the given subdivision parameters.
-    ///
-    /// The `b` and `c` parameters are as described
-    /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation). For implementation
-    /// simplicity and performance, only `b ≥ c` polyhedra are directly supported. `b < c`
-    /// polyhedra can be emulated by simply swapping the `b` and `c` parameters and mirroring the
-    /// resulting sphere.
-    pub fn new(b: NonZeroU32, c: u32) -> Self {
-        Self::from_base(BaseIcoSphere, b, c)
-    }
-}
 
 /// Represents a face of an [`IcoSphere`].
 pub type Face = subtri::Face<BaseIcoSphere>;
@@ -36,7 +17,7 @@ pub type HalfEdge = subtri::HalfEdge<BaseIcoSphere>;
 
 /// Partitions the surface of the unit sphere into a set of geodesic triangular [`Face`]s
 /// by projecting an icosahedron onto it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BaseIcoSphere;
 
 /// The number of faces on a [`BaseIcoSphere`].
@@ -82,7 +63,9 @@ impl crate::Sphere for BaseIcoSphere {
     }
 }
 
-impl crate::subtri::BaseSphere for BaseIcoSphere {
+impl crate::subtri::BaseSphere for BaseIcoSphere {}
+
+impl crate::subtri::BaseSphereInternal for BaseIcoSphere {
     type Region = statictri::Region<NUM_BASE_FACES, NUM_BASE_VERTS, BaseIcoSphere>;
 
     fn face_owns_vertex_0(&self, face: Self::Face) -> bool {
@@ -159,7 +142,7 @@ impl crate::subtri::BaseSphere for BaseIcoSphere {
 }
 
 /// The unsubdivided base sphere of an [`IcoSphere`].
-pub static BASE: StaticTriSphere<NUM_BASE_FACES, NUM_BASE_VERTS> = StaticTriSphere::new(
+static BASE: StaticTriSphere<NUM_BASE_FACES, NUM_BASE_VERTS> = StaticTriSphere::new(
     [
         // Top apex
         [0.0, 0.0, 1.0],

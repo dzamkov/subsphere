@@ -1,16 +1,11 @@
 //! Contains types related to [`StaticTriSphere`].
-use crate::subtri::{BaseRegion, BaseRegionType, BaseSphere};
+use crate::subtri::{BaseRegion, BaseRegionType, BaseSphere, BaseSphereInternal};
 
-/// A partition of the unit sphere into a set of triangular [`Face`]s which are defined
-/// explicitly using inline arrays.
+/// A [`BaseSphere`] defined explicitly using inline arrays.
 ///
 /// `F` is the number of faces, and `V` is the number of vertices. Since the size of the
 /// structure is given, this requires no dynamic memory allocation. This also allows it to
 /// constructed in a `const` context.
-///
-/// This is intended for partitions with a small number of faces. It implements
-/// [`BaseSphere`], making it a good choice to use as the base sphere for
-/// [`SubTriSphere`](crate::subtri::SubTriSphere)s.
 #[derive(Clone, Copy, Debug)]
 pub struct StaticTriSphere<const F: usize, const V: usize> {
     verts: [[f64; 3]; V],
@@ -24,8 +19,8 @@ pub struct StaticTriSphere<const F: usize, const V: usize> {
 impl<const F: usize, const V: usize> StaticTriSphere<F, V> {
     /// Creates a new [`StaticTriSphere`] with the given vertex and face data.
     ///
-    /// This will validate that the data and ensure that it describes a valid [`BaseSphere`].
-    /// If it doesn't, this will panic.
+    /// This will validate that the data describes a valid [`BaseSphere`]. If it doesn't, this will
+    /// panic.
     pub const fn new(verts: [[f64; 3]; V], indices: [[u8; 3]; F]) -> Self {
         assert!(F < 64, "too many faces");
         assert!(V < 64, "too many vertices");
@@ -170,6 +165,11 @@ impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>
 
 impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>>> BaseSphere
     for Deref<F, V, S>
+{
+}
+
+impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>>>
+    BaseSphereInternal for Deref<F, V, S>
 {
     type Region = Region<F, V, S>;
 
