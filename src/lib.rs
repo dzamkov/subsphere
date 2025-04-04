@@ -1,9 +1,12 @@
+#![doc = include_str!("../README.md")]
+#![deny(missing_debug_implementations)]
+#![deny(missing_docs)]
 pub mod icosphere;
 mod math;
 
 pub use icosphere::IcoSphere;
 
-/// Partitions the surface of a sphere into a set of spherical polygons ([`Face`]s).
+/// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
 pub trait Sphere {
     /// The type of [`Face`] on this sphere.
     type Face: Face<Vertex = Self::Vertex, HalfEdge = Self::HalfEdge>;

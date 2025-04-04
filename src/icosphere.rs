@@ -1,7 +1,8 @@
+//! Contains types related to the [`IcoSphere`] tessellation.
 use crate::math::{mat3, vec3, Scalar, Vector3};
 use std::num::NonZeroU32;
 
-/// A partition of the unit sphere into geodesic triangular [`Face`]s using an icosahedron
+/// A tessellation of the unit sphere into geodesic triangular [`Face`]s using an icosahedron
 /// subdivision scheme.
 ///
 /// More technically, this partitions the sphere by projecting the
@@ -940,6 +941,7 @@ impl IcoSphere {
 }
 
 /// An iterator over the faces of an [`IcoSphere`].
+#[derive(Clone, Debug)]
 pub struct FaceIter {
     sphere: IcoSphere,
     region: BaseRegion,
@@ -1043,6 +1045,7 @@ impl IcoSphere {
 }
 
 /// An iterator over the vertices of an [`IcoSphere`].
+#[derive(Clone, Debug)]
 pub struct VertexIter {
     sphere: IcoSphere,
     region: BaseRegion,
