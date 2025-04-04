@@ -1,10 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
-pub mod icosphere;
 mod math;
 
-pub use icosphere::IcoSphere;
+pub mod ico;
+pub mod statictri;
+pub mod subtri;
+
+pub use subtri::SubTriSphere;
+pub use ico::{IcoSphere, BaseIcoSphere};
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
 pub trait Sphere {
@@ -47,36 +51,36 @@ pub trait Face: Clone + Eq {
     ///
     /// This is also known as the [solid angle](https://en.wikipedia.org/wiki/Solid_angle)
     /// subtended by the face. The sum of the areas of all faces on a sphere is `4 π`.
-    fn area(&self) -> f64;
+    fn area(&self) -> f64 {
+        todo!()
+    }
 
     /// The number of sides (vertices or edges) that this face has.
     fn num_sides(&self) -> usize;
 
-    /// Iterates over the [`Vertex`]s of this face in counter-clockwise order, starting at
-    /// an arbitrary vertex.
-    ///
-    /// This will iterate over [`Face::num_sides`] vertices.
-    fn vertices(&self) -> impl Iterator<Item = Self::Vertex> {
-        self.boundary().map(|h| h.start())
+    /// Gets a [`Vertex`] of this face given its index within [`vertices`](Face::vertices).
+    fn vertex(&self, index: usize) -> Self::Vertex {
+        self.side(index).start()
     }
 
-    /// The first [`HalfEdge`] in [`Face::boundary`].
+    /// Iterates over the [`Vertex`]s of this face in counter-clockwise order.
     ///
-    /// [`Face::boundary`] must not be empty, so this is often a convenient and performant way
-    /// of getting an arbitrary boundary half-edge.
-    fn first_boundary(&self) -> Self::HalfEdge;
+    /// Vertices will be returned in an order consistent with [`sides`](Face::sides) and
+    /// [`start`](HalfEdge::start). This will iterate over [`num_sides`](Face::num_sides) vertices.
+    fn vertices(&self) -> impl Iterator<Item = Self::Vertex> {
+        self.sides().map(|h| h.start())
+    }
 
-    /// Iterates over the [`HalfEdge`]s which have this face as their [`HalfEdge::inside`].
-    /// 
-    /// Edges will be returned in counter-clockwise order around the face, starting with
-    /// [`Face::first_boundary`]. The iterator will return [`Face::num_sides`] edges.
-    fn boundary(&self) -> impl Iterator<Item = Self::HalfEdge> {
-        let mut h = self.first_boundary();
-        (0..self.num_sides()).map(move |_| {
-            let res = h.clone();
-            h = h.next();
-            res
-        })
+    /// Gets the [`HalfEdge`] which has the given [`index`](HalfEdge::index) and this face as its
+    /// [`inside`](HalfEdge::inside).
+    fn side(&self, index: usize) -> Self::HalfEdge;
+
+    /// Iterates over the [`HalfEdge`]s which have this face as their [`inside`](HalfEdge::inside).
+    ///
+    /// Edges will be returned in counter-clockwise order around the face, consistent with
+    /// [`HalfEdge::index`]. The iterator will return [`num_sides`](Face::num_sides) edges.
+    fn sides(&self) -> impl Iterator<Item = Self::HalfEdge> {
+        (0..self.num_sides()).map(|i| self.side(i))
     }
 }
 
@@ -109,7 +113,7 @@ pub trait Vertex: Clone + Eq {
     fn first_outgoing(&self) -> Self::HalfEdge;
 
     /// Iterates over the [`HalfEdge`]s which have this vertex as their [`HalfEdge::start`].
-    /// 
+    ///
     /// Edges will be returned in counter-clockwise order around the vertex, starting with
     /// [`Vertex::first_outgoing`]. The iterator will return [`Vertex::degree`] edges.
     ///
@@ -127,14 +131,18 @@ pub trait Vertex: Clone + Eq {
 
 /// Represents one "side" or direction of an edge on a [`Sphere`].
 ///
-/// Half-edges are oriented such that they go counter-clockwise around their [`HalfEdge::inside`]
-/// face.
+/// Half-edges are oriented such that they go counter-clockwise around their
+/// [`inside`](HalfEdge::inside) face.
 pub trait HalfEdge: Clone + Eq {
     /// The type of [`Face`] on the sphere.
     type Face: Face<Vertex = Self::Vertex, HalfEdge = Self>;
 
     /// The type of [`Vertex`] on the sphere.
     type Vertex: Vertex<Face = Self::Face, HalfEdge = Self>;
+
+    /// The index of this half-edge within the [`Face::sides`] list of its
+    /// [`inside`](HalfEdge::inside).
+    fn index(&self) -> usize;
 
     /// Gets the [`Face`] whose interior boundary contains this half-edge.
     fn inside(&self) -> Self::Face;
@@ -147,11 +155,11 @@ pub trait HalfEdge: Clone + Eq {
     /// The returned half-edge will go in the opposite direction along the same edge.
     fn complement(&self) -> Self;
 
-    /// Gets the half-edge which shares the [`HalfEdge::inside`] face of this half-edge and
+    /// Gets the half-edge which shares the [`inside`](HalfEdge::inside) face of this half-edge and
     /// precedes it in counter-clockwise order around the face.
     fn prev(&self) -> Self;
 
-    /// Gets the half-edge which shares the [`HalfEdge::inside`] face of this half-edge and
+    /// Gets the half-edge which shares the [`inside`](HalfEdge::inside) face of this half-edge and
     /// follows it in counter-clockwise order around the face.
     fn next(&self) -> Self;
 }
