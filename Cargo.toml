@@ -1,12 +1,12 @@
 [package]
 name = "subsphere"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Dmitry Zamkov <dmitry94@gmail.com>"]
 description = "Sphere tessellation toolkit"
 repository = "https://github.com/dzamkov/subsphere"
 license = "MIT OR Apache-2.0"
-keywords = ["gamedev", "math", "sphere", "tessellation"]
+keywords = ["gamedev", "math", "geometry", "sphere", "tessellation"]
 categories = ["mathematics", "data-structures", "graphics"]
 readme = "README.md"
 
