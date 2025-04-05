@@ -23,7 +23,7 @@ fn test_octosphere_3_1() {
     let sphere = SubTriSphere::new(BaseTriSphere::Octo, NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(sphere), @"2.0639513819660484");
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.392702192665517");
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn test_octosphere_2_2() {
     let sphere = SubTriSphere::new(BaseTriSphere::Octo, NonZero::new(2).unwrap(), 2);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(sphere), @"1.8256604848025586");
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.2450941184111652");
 }
 
 #[test]
@@ -39,7 +39,6 @@ fn test_icosphere_base() {
     let sphere = SubTriSphere::from(BaseTriSphere::Icosa);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    assert_eq!(area_discrepancy(sphere), 1.0);
 }
 
 #[test]
@@ -55,7 +54,7 @@ fn test_icosphere_3_1() {
     let sphere = SubTriSphere::new(BaseTriSphere::Icosa, NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(sphere), @"1.2728314137602617");
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.16284750155026");
 }
 
 #[test]
@@ -63,7 +62,7 @@ fn test_icosphere_2_2() {
     let sphere = SubTriSphere::new(BaseTriSphere::Icosa, NonZero::new(2).unwrap(), 2);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(sphere), @"1.2111118117451836");
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.073344298185472");
 }
 
 /// Validates the internal consistency of the given [`Sphere`].

@@ -5,8 +5,9 @@ use crate::Sphere as SphereExt;
 use crate::Vertex as VertexExt;
 use crate::basetri::BaseTriSphere;
 use crate::basetri::Face as BaseFace;
+use crate::basetri::HalfEdge as BaseHalfEdge;
 use crate::basetri::Vertex as BaseVertex;
-use crate::math::{Vector3, mat3, vec3};
+use crate::math::{self, Scalar, Vector3, mat3, vec3};
 use std::num::NonZeroU32;
 
 /// A tessellation of the unit sphere into triangular [`Face`]s constructed by subdividing a
@@ -191,11 +192,11 @@ impl crate::Face for Face {
 
     fn area(&self) -> f64 {
         let [[u_0, v_0], [u_1, v_1], [u_2, v_2]] = self.local_coords();
-        let p_0 = self.sphere.project(self.region, u_0 as f64, v_0 as f64);
-        let p_1 = self.sphere.project(self.region, u_1 as f64, v_1 as f64);
-        let p_2 = self.sphere.project(self.region, u_2 as f64, v_2 as f64);
-        let d = 1.0 + vec3::dot(p_0, p_1) + vec3::dot(p_1, p_2) + vec3::dot(p_2, p_0);
-        (mat3::det([p_0, p_1, p_2]) / d).atan() * 2.0
+        let eval = self.sphere.eval().region(self.region);
+        let p_0 = eval.project(u_0 as f64, v_0 as f64);
+        let p_1 = eval.project(u_1 as f64, v_1 as f64);
+        let p_2 = eval.project(u_2 as f64, v_2 as f64);
+        math::sphere_tri_area([p_0, p_1, p_2])
     }
 
     fn num_sides(&self) -> usize {
@@ -480,7 +481,9 @@ impl crate::Vertex for Vertex {
 
     fn pos(&self) -> [f64; 3] {
         self.sphere
-            .project(self.region, self.u as f64, self.v as f64)
+            .eval()
+            .region(self.region)
+            .project(self.u as f64, self.v as f64)
     }
 
     fn degree(&self) -> usize {
@@ -605,8 +608,8 @@ impl SubTriSphere {
     /// Gets the index of the first face which is owned by the given base region.
     fn base_face_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
-        let num_edge_regions_before = face.num_owned_edges_before()
-            + (region.ty() > BaseRegionType::Edge0) as usize;
+        let num_edge_regions_before =
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
         let num_interior_regions_before =
             face.index() + (region.ty() > BaseRegionType::Interior) as usize;
         num_edge_regions_before * self.num_faces_per_edge_region()
@@ -619,68 +622,13 @@ impl SubTriSphere {
         let face = region.owner();
         let num_owned_vertices_before = face.num_owned_vertices_before()
             + (face.owns_vertex_1() && region.ty() > BaseRegionType::Edge0) as usize;
-        let num_edge_regions_before = face.num_owned_edges_before()
-            + (region.ty() > BaseRegionType::Edge0) as usize;
+        let num_edge_regions_before =
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
         let num_interior_regions_before =
             face.index() + (region.ty() > BaseRegionType::Interior) as usize;
         num_owned_vertices_before
             + num_edge_regions_before * self.num_vertices_per_edge_region()
             + num_interior_regions_before * self.num_vertices_per_interior_region()
-    }
-
-    /// Projects a point in the local coordinate space of this region to a point on the unit
-    /// sphere.
-    fn project(&self, region: BaseRegion, u: f64, v: f64) -> Vector3 {
-        let b = self.b() as f64;
-        let c = self.c() as f64;
-        let norm_sqr = b * b + b * c + c * c;
-        let (face, weights) = if region.ty().is_edge() {
-            let w_left = (v * b - u * c) / norm_sqr;
-            if region.ty() == BaseRegionType::Edge0 {
-                if w_left >= 0.0 {
-                    let w_1 = (u * b + (u + v) * c) / norm_sqr;
-                    let w_2 = w_left;
-                    (region.owner(), [1.0 - w_1 - w_2, w_1, w_2])
-                } else {
-                    let adj = region.owner().side(0).complement();
-                    let w_2 = -w_left;
-                    let w_0 = ((u + v) * b + v * c) / norm_sqr;
-                    let w_1 = 1.0 - w_0 - w_2;
-                    let mut weights = [w_0, w_1, w_2];
-                    weights.rotate_right(adj.index());
-                    (adj.inside(), weights)
-                }
-            } else if w_left <= 0.0 {
-                let w_1 = -w_left;
-                let w_2 = ((u + v) * b + v * c) / norm_sqr;
-                (region.owner(), [1.0 - w_1 - w_2, w_1, w_2])
-            } else {
-                let adj = region.owner().side(2).complement();
-                let w_1 = (u * b + (u + v) * c) / norm_sqr;
-                let w_2 = w_left;
-                let w_0 = 1.0 - w_1 - w_2;
-                let mut weights = [w_0, w_1, w_2];
-                weights.rotate_right(adj.index());
-                (adj.inside(), weights)
-            }
-        } else {
-            let v = v + c;
-            let w_1 = (u * b + (u + v) * c) / norm_sqr;
-            let w_2 = (v * b - u * c) / norm_sqr;
-            (region.owner(), [1.0 - w_1 - w_2, w_1, w_2])
-        };
-        mat3::apply(
-            [
-                face.vertex(0).pos(),
-                face.vertex(1).pos(),
-                face.vertex(2).pos(),
-            ],
-            interpolate(
-                self.base().edge_angle(),
-                self.base().edge_cos_angle(),
-                weights,
-            ),
-        )
     }
 }
 
@@ -938,42 +886,259 @@ impl BaseTriSphere {
     }
 }
 
-/// Interpolation function for a base face.
-///
-/// Suppose the vertices of a base face are `v₀`, `v₁`, and `v₂`. The angle between any pair
-/// of these vertices is given by `angle` and `cos_angle` is the cosine of that angle.
-///
-/// The interpolation function is given weights `w₀`, `w₁`, and `w₂` such that `wᵢ ≥ 0` and
-/// `w₀ + w₁ + w₂ = 1`. It will compute an approximation of the "spherical" interpolation of the
-/// three vertices with respect to the given weights, `r = c₀ v₀ + c₁ v₁ + c₂ v₂` and return the
-/// coefficients `[c₀, c₁, c₂]`.
-///
-/// It is guaranteed that:
-///  * `r` is on the unit sphere
-///  * If `wᵢ` is `1`, `cᵢ` will also be `1`.
-///
-/// See [this paper](https://mathweb.ucsd.edu/~sbuss/ResearchWeb/spheremean/paper.pdf) for
-/// a precise definition of spherical interpolation (which we only approximate here, for
-/// performance reasons).
-fn interpolate(angle: f64, cos_angle: f64, weights: [f64; 3]) -> [f64; 3] {
-    let [w_0, w_1, w_2] = weights;
+// TODO: For best performance, `SphereEvaluator` should be cached when performing operations
+// on the same sphere multiple times. This will require the user's help, so we should figure out a
+// way to expose this to them.
 
-    // Compute initial unnormalized coefficients. `cᵢ = (wᵢ * angle).sin()` assures that this
-    // behaves like a perfect SLERP (https://en.wikipedia.org/wiki/Slerp) when one of
-    // the weights is `0`.
-    // TODO: it might be possible to create a faster implementation of `(x * angle).sin()`.
-    // This could also make the result portable, since `sin` isn't.
-    let c_0 = (w_0 * angle).sin();
-    let c_1 = (w_1 * angle).sin();
-    let c_2 = (w_2 * angle).sin();
+/// Encapsulates the information needed to convert between local coordinates and positions
+/// on a [`SubTriSphere`].
+struct SphereEvaluator {
+    /// Suppose the vertices of a base face are `v₀`, `v₁`, and `v₂`. This provides a set of
+    /// coefficients `c₀`, `c₁`, and `c₂` such that `p₀ = c₀ v₀ + c₁ v₁ + c₂ v₂` is the
+    /// position of the origin of the interior region corresponding to the face. Due to
+    /// symmetry, the other points of the interior region can be computed by rotating these
+    /// coefficients:
+    ///  * `p₀ = c₀ v₀ + c₁ v₁ + c₂ v₂`
+    ///  * `p₁ = c₀ v₁ + c₁ v₂ + c₂ v₀`
+    ///  * `p₂ = c₀ v₂ + c₁ v₀ + c₂ v₁`
+    p_coeffs: [Scalar; 3],
 
-    // Normalize coefficients such that, when applied to the 3 vertices of the base face,
-    // the result will be on the unit sphere
-    let norm_sqr =
-        c_0 * c_0 + c_1 * c_1 + c_2 * c_2 + 2.0 * cos_angle * (c_0 * c_1 + c_1 * c_2 + c_2 * c_0);
+    /// The angle, in radians, subtended by a step of length `1` in the local coordinate space of
+    /// a region.
+    step_angle: Scalar,
+
+    /// The angle, in radians, subtended by an edge corresponding to the `b` parameter of the
+    /// [`SubTriSphere`].
+    full_angle_b: Scalar,
+
+    /// The angle, in radians, subtended by an edge corresponding to the `c` parameter of the
+    /// [`SubTriSphere`].
+    full_angle_c: Scalar,
+}
+
+impl SubTriSphere {
+    /// Constructs a [`SphereEvaluator`] for this [`SubTriSphere`].
+    fn eval(&self) -> SphereEvaluator {
+        let b = self.b() as f64;
+        let c = self.c() as f64;
+        if c == 0.0 {
+            let full_angle_b = self.base().edge_angle();
+            return SphereEvaluator {
+                p_coeffs: [1.0, 0.0, 0.0],
+                step_angle: full_angle_b / b,
+                full_angle_b,
+                full_angle_c: 0.0,
+            };
+        }
+
+        // Compute initial estimate of the first interior point `p₀ = c₀ v₀ + c₁ v₁ + c₂ v₂`
+        let w_total = b * b + b * c + c * c;
+        let w_0 = b * b / w_total;
+        let w_1 = c * c / w_total;
+        let w_2 = b * c / w_total;
+        let angle = self.base().edge_angle();
+        let cos_angle = self.base().edge_cos_angle();
+        let c_0 = (w_0 * angle).sin();
+        let c_1 = (w_1 * angle).sin();
+        let c_2 = (w_2 * angle).sin();
+        let mut p_coeffs = normalize_coeffs(cos_angle, [c_0, c_1, c_2]);
+
+        // For continuity between regions, it is very important that `p₂`, `p₀`,
+        // and `v₀` all lie on the same plane, and that `angle(p₀, v₀) / angle(p₂, v₀) = c / b`.
+        // To ensure this, we will refine our initial estimate above.
+        let mut cos_full_angle_b = p_coeffs[1] + (p_coeffs[0] + p_coeffs[2]) * cos_angle;
+        let mut sin_full_angle_b = (1.0 - cos_full_angle_b * cos_full_angle_b).sqrt();
+        let mut full_angle_b = cos_full_angle_b.acos();
+
+        // TODO: Find a better algorithm that converges faster, or a closed form solution.
+        for _ in 0..30 {
+            let t = c / b;
+            p_coeffs = vec3::add(
+                [
+                    ((1.0 - t) * full_angle_b).sin() / sin_full_angle_b,
+                    0.0,
+                    0.0,
+                ],
+                vec3::mul(
+                    [p_coeffs[1], p_coeffs[2], p_coeffs[0]],
+                    (t * full_angle_b).sin() / sin_full_angle_b,
+                ),
+            );
+            cos_full_angle_b = p_coeffs[1] + (p_coeffs[0] + p_coeffs[2]) * cos_angle;
+            sin_full_angle_b = (1.0 - cos_full_angle_b * cos_full_angle_b).sqrt();
+            full_angle_b = cos_full_angle_b.acos();
+        }
+
+        // Compute angles of region edges
+        let full_angle_c = full_angle_b * c / b;
+        let step_angle = full_angle_b / b;
+        SphereEvaluator {
+            p_coeffs,
+            step_angle,
+            full_angle_b,
+            full_angle_c,
+        }
+    }
+}
+
+/// Given a set of coefficients which are to be applied to a set of vertices, normalizes them
+/// such that the resulting point is on the unit sphere.
+///
+/// `cos_angle` is the cosine of the angle (or, equivalently, the dot product) between any
+/// two of the vertices.
+fn normalize_coeffs(cos_angle: Scalar, coeffs: [Scalar; 3]) -> [Scalar; 3] {
+    let norm_sqr = vec3::dot(coeffs, coeffs)
+        + 2.0 * cos_angle * (coeffs[0] * coeffs[1] + coeffs[1] * coeffs[2] + coeffs[2] * coeffs[0]);
     let norm = norm_sqr.sqrt();
-    let c_0 = c_0 / norm;
-    let c_1 = c_1 / norm;
-    let c_2 = c_2 / norm;
-    [c_0, c_1, c_2]
+    vec3::mul(coeffs, 1.0 / norm)
+}
+
+impl SphereEvaluator {
+    /// Constructs an [`RegionEvaluator`] for a particular region of the sphere.
+    pub fn region(&self, region: BaseRegion) -> RegionEvaluator {
+        match region.ty() {
+            BaseRegionType::Edge0 => self.edge(region.owner().side(0)).into(),
+            BaseRegionType::Interior => self.interior(region.owner()).into(),
+            BaseRegionType::Edge2 => self.edge(region.owner().side(2).complement()).into(),
+        }
+    }
+
+    /// Constructs an [`InteriorEvaluator`] for a particular interior region of the sphere.
+    pub fn interior(&self, face: BaseFace) -> InteriorEvaluator {
+        let v_0 = face.vertex(0).pos();
+        let v_1 = face.vertex(1).pos();
+        let v_2 = face.vertex(2).pos();
+        InteriorEvaluator {
+            p: [
+                mat3::apply([v_0, v_1, v_2], self.p_coeffs),
+                mat3::apply([v_1, v_2, v_0], self.p_coeffs),
+                mat3::apply([v_2, v_0, v_1], self.p_coeffs),
+            ],
+            step_angle: self.step_angle,
+            full_angle: safe_angle(self.full_angle_b - self.full_angle_c),
+        }
+    }
+
+    /// Constructs an [`EdgeEvaluator`] for a particular edge region of the sphere.
+    pub fn edge(&self, edge: BaseHalfEdge) -> EdgeEvaluator {
+        let comp = edge.complement();
+        let v_0 = edge.start().pos();
+        let v_1 = comp.start().pos();
+        let v_left = edge.prev().start().pos();
+        let v_right = comp.prev().start().pos();
+        EdgeEvaluator {
+            p_0_0: v_0,
+            p_1_1: v_1,
+            p_0_1: mat3::apply([v_0, v_1, v_left], self.p_coeffs),
+            p_1_0: mat3::apply([v_1, v_0, v_right], self.p_coeffs),
+            step_angle: self.step_angle,
+            full_angle_u: self.full_angle_b,
+            full_angle_v: safe_angle(self.full_angle_c),
+        }
+    }
+}
+
+/// Encapsulates the information needed to convert between local coordinates on a [`BaseRegion`]
+/// and positions on a [`SubTriSphere`].
+enum RegionEvaluator {
+    Interior(InteriorEvaluator),
+    Edge(EdgeEvaluator),
+}
+
+impl RegionEvaluator {
+    /// Projects a point in the local coordinate space of this region to a point on the sphere.
+    pub fn project(&self, u: Scalar, v: Scalar) -> Vector3 {
+        match self {
+            RegionEvaluator::Interior(eval) => eval.project(u, v),
+            RegionEvaluator::Edge(eval) => eval.project(u, v),
+        }
+    }
+}
+
+impl From<InteriorEvaluator> for RegionEvaluator {
+    fn from(eval: InteriorEvaluator) -> Self {
+        RegionEvaluator::Interior(eval)
+    }
+}
+
+impl From<EdgeEvaluator> for RegionEvaluator {
+    fn from(eval: EdgeEvaluator) -> Self {
+        RegionEvaluator::Edge(eval)
+    }
+}
+
+/// Encapsulates the information needed to convert between local coordinates on an interior
+/// [`BaseRegion`] and positions on a [`SubTriSphere`].
+struct InteriorEvaluator {
+    /// The positions of the endpoints of the region on the sphere.
+    p: [Vector3; 3],
+
+    /// The angle, in radians, subtended by a step of length `1` in the local coordinate space of
+    /// this region.
+    step_angle: Scalar,
+
+    /// The angle, in radians, between any two endpoints of the region.
+    full_angle: Scalar,
+}
+
+impl InteriorEvaluator {
+    /// Projects a point in the local coordinate space of this region to a point on the sphere.
+    pub fn project(&self, u: Scalar, v: Scalar) -> Vector3 {
+        let c_1 = (u * self.step_angle).sin();
+        let c_2 = (v * self.step_angle).sin();
+        let c_0 = (self.full_angle - u * self.step_angle - v * self.step_angle).sin();
+        vec3::normalize(mat3::apply(self.p, [c_0, c_1, c_2]))
+    }
+}
+
+/// Encapsulates the information needed to convert between local coordinates on an edge
+/// [`BaseRegion`] and positions on a [`SubTriSphere`].
+struct EdgeEvaluator {
+    /// The position of the origin of the region on the sphere.
+    p_0_0: Vector3,
+
+    /// The position of the far (U = 1, V = 1) corner of the region on the sphere.
+    p_1_1: Vector3,
+
+    /// The position of the left (U = 0, V = 1) corner of the region on the sphere.
+    p_0_1: Vector3,
+
+    /// The position of the right (U = 1, V = 0) corner of the region on the sphere.
+    p_1_0: Vector3,
+
+    /// The angle, in radians, subtended by a step of length `1` in the local coordinate space of
+    /// this region.
+    step_angle: Scalar,
+
+    /// The angle, in radians, subtended by the U edge of this region.
+    full_angle_u: Scalar,
+
+    /// The angle, in radians, subtended by the V edge of this region.
+    full_angle_v: Scalar,
+}
+
+impl EdgeEvaluator {
+    /// Projects a point in the local coordinate space of this region to a point on the sphere.
+    pub fn project(&self, u: Scalar, v: Scalar) -> Vector3 {
+        let c_u_0 = (self.full_angle_u - u * self.step_angle).sin();
+        let c_u_1 = (u * self.step_angle).sin();
+        let c_v_0 = (self.full_angle_v - v * self.step_angle).sin();
+        let c_v_1 = (v * self.step_angle).sin();
+        vec3::normalize(vec3::add(
+            vec3::add(
+                vec3::mul(self.p_0_0, c_u_0 * c_v_0),
+                vec3::mul(self.p_1_0, c_u_1 * c_v_0),
+            ),
+            vec3::add(
+                vec3::mul(self.p_0_1, c_u_0 * c_v_1),
+                vec3::mul(self.p_1_1, c_u_1 * c_v_1),
+            ),
+        ))
+    }
+}
+
+/// Checks if `angle` is zero. If so, replaces it with an arbitrary positive value. Otherwise
+/// returns it.
+fn safe_angle(angle: Scalar) -> Scalar {
+    if angle == 0.0 { 1.0 } else { angle }
 }

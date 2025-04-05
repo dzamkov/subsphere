@@ -37,8 +37,14 @@ pub(crate) mod vec3 {
         [
             a[1] * b[2] - a[2] * b[1],
             a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0]
+            a[0] * b[1] - a[1] * b[0],
         ]
+    }
+
+    /// Normalizes a vector.
+    #[inline]
+    pub fn normalize(a: Vector3) -> Vector3 {
+        mul(a, 1.0 / dot(a, a).sqrt())
     }
 }
 
@@ -60,4 +66,14 @@ pub(crate) mod mat3 {
     pub fn det(m: Matrix3) -> Scalar {
         vec3::dot(m[0], vec3::cross(m[1], m[2]))
     }
+}
+
+/// Computes the area (or equivalently, the solid angle) of a spherical triangle.
+pub fn sphere_tri_area(points: [Vector3; 3]) -> Scalar {
+    // https://www.johndcook.com/blog/2021/11/29/area-of-spherical-triangle/
+    let d = 1.0
+        + vec3::dot(points[0], points[1])
+        + vec3::dot(points[1], points[2])
+        + vec3::dot(points[2], points[0]);
+    (mat3::det(points) / d).atan() * 2.0
 }

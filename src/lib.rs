@@ -63,7 +63,7 @@ pub trait Face: Clone + Eq {
     /// The number of sides (vertices or edges) that this face has.
     fn num_sides(&self) -> usize;
 
-    /// Gets a [`Vertex`] of this face given its index within [`vertices`](Face::vertices).
+    /// Gets a [`Vertex`] of this face given its index within [`Face::vertices`].
     fn vertex(&self, index: usize) -> Self::Vertex {
         self.side(index).start()
     }

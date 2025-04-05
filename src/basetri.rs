@@ -212,11 +212,19 @@ impl crate::HalfEdge for HalfEdge {
     }
 
     fn prev(&self) -> Self {
-        todo!()
+        HalfEdge(if self.0 & 0b11 == 0 {
+            self.0 + 2
+        } else {
+            self.0 - 1
+        })
     }
 
     fn next(&self) -> Self {
-        todo!()
+        HalfEdge(if self.0 & 0b11 == 2 {
+            self.0 - 2
+        } else {
+            self.0 + 1
+        })
     }
 }
 
