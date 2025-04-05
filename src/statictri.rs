@@ -14,7 +14,7 @@ pub struct StaticTriSphere<const F: usize, const V: usize> {
     edge_cos_angle: f64,
     adjacent: [[u8; 3]; F],
     vert_owner: [u8; V],
-    owns_vert_0: u64,
+    owns_vert_1: u64,
     owns_edge_2: u64,
 }
 
@@ -64,21 +64,21 @@ impl<const F: usize, const V: usize> StaticTriSphere<F, V> {
             i += 1;
         }
 
-        // Assign ownership of each base vertex to the first base face that contains it as it's 0
-        // vertex.
+        // Assign ownership of each vertex to the first face that contains it as it's 0 vertex
         let mut vert_owner: [u8; V] = [u8::MAX; V];
-        let mut owns_vert_0 = 0;
+        vert_owner[0] = 0;
+        let mut owns_vert_1 = 0;
         let mut i = 0;
         while i < F {
-            let v_0 = indices[i][0] as usize;
-            if vert_owner[v_0] == u8::MAX {
-                vert_owner[v_0] = i as u8;
-                owns_vert_0 |= 1 << i;
+            let v_1 = indices[i][1] as usize;
+            if vert_owner[v_1] == u8::MAX {
+                vert_owner[v_1] = i as u8;
+                owns_vert_1 |= 1 << i;
             }
             i += 1;
         }
 
-        // Verify that every base vertex has an owner
+        // Verify that every vertex has an owner
         let mut j = 0;
         while j < V {
             assert!(vert_owner[j] != u8::MAX, "vertex does not have an owner");
@@ -131,7 +131,7 @@ impl<const F: usize, const V: usize> StaticTriSphere<F, V> {
             edge_cos_angle,
             adjacent,
             vert_owner,
-            owns_vert_0,
+            owns_vert_1,
             owns_edge_2,
         }
     }
@@ -190,9 +190,9 @@ impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>
         self.0.as_ref().edge_cos_angle
     }
 
-    fn face_owns_vertex_0(&self, face: Self::Face) -> bool {
+    fn face_owns_vertex_1(&self, face: Self::Face) -> bool {
         let sphere = self.0.as_ref();
-        (sphere.owns_vert_0 >> face.index) & 1 == 1
+        (sphere.owns_vert_1 >> face.index) & 1 == 1
     }
 
     fn face_owns_edge_2(&self, face: Self::Face) -> bool {
@@ -211,7 +211,7 @@ impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>
     fn num_owned_vertices_before(&self, face: Self::Face) -> usize {
         let sphere = self.0.as_ref();
         let before_mask = (1 << face.index) - 1;
-        (sphere.owns_vert_0 & before_mask).count_ones() as usize
+        (sphere.owns_vert_1 & before_mask).count_ones() as usize
     }
 
     fn num_owned_edges_before(&self, face: Self::Face) -> usize {
@@ -288,7 +288,7 @@ impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>
     type HalfEdge = HalfEdge<F, V, S>;
 
     fn index(&self) -> usize {
-        todo!()
+        self.index as usize
     }
 
     fn pos(&self) -> [f64; 3] {

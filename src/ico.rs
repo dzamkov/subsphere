@@ -72,11 +72,11 @@ static BASE: StaticTriSphere<NUM_BASE_FACES, NUM_BASE_VERTS> = StaticTriSphere::
         [4, 10, 5],
         [10, 6, 5],
         // Bottom cap
-        [11, 6, 10],
-        [11, 10, 9],
-        [11, 9, 8],
-        [11, 8, 7],
-        [11, 7, 6],
+        [10, 11, 6],
+        [6, 11, 7],
+        [7, 11, 8],
+        [8, 11, 9],
+        [9, 11, 10],
     ],
     EDGE_ANGLE,
     EDGE_COS_ANGLE
@@ -150,8 +150,8 @@ impl crate::subtri::BaseSphereInternal for BaseIcoSphere {
         statictri::Deref(Self).edge_cos_angle()
     }
 
-    fn face_owns_vertex_0(&self, face: Self::Face) -> bool {
-        statictri::Deref(Self).face_owns_vertex_0(face)
+    fn face_owns_vertex_1(&self, face: Self::Face) -> bool {
+        statictri::Deref(Self).face_owns_vertex_1(face)
     }
 
     fn face_owns_edge_2(&self, face: Self::Face) -> bool {

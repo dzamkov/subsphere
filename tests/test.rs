@@ -3,6 +3,38 @@ use std::num::NonZero;
 use subsphere::{Face, Sphere, Vertex};
 
 #[test]
+fn test_octosphere_base() {
+    let sphere = subsphere::OctoSphere::base();
+    validate(sphere);
+    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1");
+}
+
+#[test]
+fn test_octosphere_4_0() {
+    let sphere = subsphere::OctoSphere::new(NonZero::new(4).unwrap(), 0);
+    validate(sphere);
+    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.5543100839896127");
+}
+
+#[test]
+fn test_octosphere_3_1() {
+    let sphere = subsphere::OctoSphere::new(NonZero::new(3).unwrap(), 1);
+    validate(sphere);
+    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    insta::assert_snapshot!(area_discrepancy(sphere), @"2.0639513819660484");
+}
+
+#[test]
+fn test_octosphere_2_2() {
+    let sphere = subsphere::OctoSphere::new(NonZero::new(2).unwrap(), 2);
+    validate(sphere);
+    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.8256604848025586");
+}
+
+#[test]
 fn test_icosphere_base() {
     let sphere = subsphere::IcoSphere::base();
     validate(sphere);
@@ -23,7 +55,7 @@ fn test_icosphere_3_1() {
     let sphere = subsphere::IcoSphere::new(NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(sphere), @"1.2728314137602614");
+    insta::assert_snapshot!(area_discrepancy(sphere), @"1.2728314137602617");
 }
 
 #[test]

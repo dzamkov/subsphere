@@ -22,7 +22,7 @@ pub struct SubTriSphere<Base: BaseSphere> {
 /// This is a [`crate::Sphere`] with equilateral triangular faces. There are effectively
 /// three topologically distinct implementations of this trait:
 ///  * `BaseTetraSphere` (**TODO**)
-///  * `BaseOctoSphere` (**TODO**)
+///  * [`BaseOctoSphere`](crate::octo::BaseOctoSphere)
 ///  * [`BaseIcoSphere`](crate::ico::BaseIcoSphere)
 #[allow(private_bounds)]
 pub trait BaseSphere: crate::Sphere + Eq + Clone + BaseSphereInternal {}
@@ -33,9 +33,9 @@ pub trait BaseSphere: crate::Sphere + Eq + Clone + BaseSphereInternal {}
 /// each vertex and edge, subject to the following rules:
 ///  * Every vertex and edge is owned by exactly one face.
 ///  * Faces must own their first edge.
-///  * Faces must not own their second edge.
 ///  * Faces may own their third edge.
-///  * Faces may only own their first vertex.
+///  * The first face (index 0) must own its first vertex, which is also the global first vertex.
+///  * Faces may own their second vertex.
 pub(crate) trait BaseSphereInternal: crate::Sphere + Eq + Clone {
     /// The type of [`BaseRegion`] for this base shape.
     type Region: BaseRegion<Face = Self::Face>;
@@ -47,8 +47,8 @@ pub(crate) trait BaseSphereInternal: crate::Sphere + Eq + Clone {
     /// the dot product between any two connected vertices.
     fn edge_cos_angle(&self) -> f64;
 
-    /// Indicates whether the given face owns its first vertex.
-    fn face_owns_vertex_0(&self, face: Self::Face) -> bool;
+    /// Indicates whether the given face owns its second vertex.
+    fn face_owns_vertex_1(&self, face: Self::Face) -> bool;
 
     /// Indicates whether the given face owns its third edge.
     fn face_owns_edge_2(&self, face: Self::Face) -> bool;
@@ -210,7 +210,13 @@ impl<Base: BaseSphere> crate::Sphere for SubTriSphere<Base> {
 
     #[allow(refining_impl_trait)]
     fn vertices(&self) -> VertexIter<Base> {
-        self.vertices_from(self.base.first_region())
+        VertexIter {
+            sphere: self.clone(),
+            region: self.base.first_region(),
+            u: 0,
+            u_end: self.b(),
+            v: 0,
+        }
     }
 }
 
@@ -520,12 +526,21 @@ impl<Base: BaseSphere> Vertex<Base> {
 
     /// Constructs a [`Vertex`] for one of the base vertices.
     pub fn base(sphere: SubTriSphere<Base>, source: Base::Vertex) -> Self {
-        let owner = sphere.base.vertex_owner(source);
-        Self {
-            sphere,
-            region: Base::Region::new(owner, BaseRegionType::Edge0),
-            u: 0,
-            v: 0,
+        let owner = sphere.base.vertex_owner(source.clone());
+        if source.index() == 0 {
+            Self {
+                sphere: sphere.clone(),
+                region: Base::Region::new(owner, BaseRegionType::Edge0),
+                u: 0,
+                v: 0,
+            }
+        } else {
+            Self {
+                sphere: sphere.clone(),
+                region: Base::Region::new(owner, BaseRegionType::Edge0),
+                u: sphere.b(),
+                v: sphere.c,
+            }
         }
     }
 }
@@ -536,19 +551,16 @@ impl<Base: BaseSphere> crate::Vertex for Vertex<Base> {
 
     fn index(&self) -> usize {
         if self.region.ty().is_edge() {
-            let owns_origin = self.sphere.base.face_owns_vertex_0(self.region.owner())
-                && self.region.ty() == BaseRegionType::Edge0;
             self.sphere.base_vertex_index(self.region.clone())
                 + self.v as usize * (self.sphere.b() as usize - 1)
                 + self.u as usize
-                - !owns_origin as usize
         } else if self.sphere.c < self.sphere.b() {
             let n = (self.sphere.b() - self.sphere.c) as usize;
             self.sphere.base_vertex_index(self.region.clone())
                 + (self.v as usize - 1) * (2 * n - self.v as usize - 2) / 2
-                + (self.u as usize - 1)
+                + self.u as usize
         } else {
-            self.sphere.base_vertex_index(self.region.clone())
+            self.sphere.base_vertex_index(self.region.clone()) + 1
         }
     }
 
@@ -692,11 +704,12 @@ impl<Base: BaseSphere> SubTriSphere<Base> {
             + num_interior_regions_before * self.num_faces_per_interior_region()
     }
 
-    /// Gets the index of the first vertex which is owned by the given base region.
+    /// Gets the index of the first vertex which is owned by the given base region,
+    /// not counting vertex 0.
     fn base_vertex_index(&self, region: Base::Region) -> usize {
         let face = region.owner();
         let num_origin_vertices_before = self.base.num_owned_vertices_before(face.clone())
-            + (self.base.face_owns_vertex_0(face.clone()) && region.ty() > BaseRegionType::Edge0)
+            + (self.base.face_owns_vertex_1(face.clone()) && region.ty() > BaseRegionType::Edge0)
                 as usize;
         let num_edge_regions_before = self.base.num_owned_edges_before(face.clone())
             + (region.ty() > BaseRegionType::Edge0) as usize;
@@ -754,7 +767,7 @@ impl<Base: BaseSphere> SubTriSphere<Base> {
                 face.vertex(1).pos(),
                 face.vertex(2).pos(),
             ],
-            interpolate(self.base.edge_angle(), self.base.edge_cos_angle(), weights)
+            interpolate(self.base.edge_angle(), self.base.edge_cos_angle(), weights),
         )
     }
 }
@@ -853,12 +866,10 @@ impl<Base: BaseSphere> SubTriSphere<Base> {
     /// Iterates over the vertices of this [`SubTriSphere`], starting with the given region.
     fn vertices_from(&self, region: Base::Region) -> VertexIter<Base> {
         if region.ty().is_edge() {
-            let has_origin = self.base.face_owns_vertex_0(region.owner())
-                && region.ty() == BaseRegionType::Edge0;
             VertexIter {
                 sphere: self.clone(),
                 region,
-                u: !has_origin as u32,
+                u: 1,
                 u_end: self.b(),
                 v: 0,
             }
@@ -913,6 +924,18 @@ impl<Base: BaseSphere> Iterator for VertexIter<Base> {
                     self.v += 1;
                     self.u = 1;
                     continue;
+                } else if self.u <= self.u_end
+                    && self.region.ty() == BaseRegionType::Edge0
+                    && self.sphere.base.face_owns_vertex_1(self.region.owner())
+                {
+                    let res = Vertex {
+                        sphere: self.sphere.clone(),
+                        region: self.region.clone(),
+                        u: self.u,
+                        v: self.v,
+                    };
+                    self.u += 1;
+                    return Some(res);
                 }
             } else {
                 let n = self.sphere.b() - self.sphere.c;
@@ -937,7 +960,7 @@ impl<Base: BaseSphere> Iterator for VertexIter<Base> {
 ///
 /// Suppose the vertices of a base face are `v₀`, `v₁`, and `v₂`. The angle between any pair
 /// of these vertices is given by `angle` and `cos_angle` is the cosine of that angle.
-/// 
+///
 /// The interpolation function is given weights `w₀`, `w₁`, and `w₂` such that `wᵢ ≥ 0` and
 /// `w₀ + w₁ + w₂ = 1`. It will compute an approximation of the "spherical" interpolation of the
 /// three vertices with respect to the given weights, `r = c₀ v₀ + c₁ v₁ + c₂ v₂` and return the

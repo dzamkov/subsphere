@@ -5,9 +5,11 @@ mod math;
 mod statictri;
 
 pub mod ico;
+pub mod octo;
 pub mod subtri;
 
 pub use subtri::SubTriSphere;
+pub use octo::{OctoSphere, BaseOctoSphere};
 pub use ico::{IcoSphere, BaseIcoSphere};
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
