@@ -18,19 +18,17 @@ pub struct SubTriSphere<Base: BaseSphere> {
 }
 
 /// Describes a potential base shape for a [`SubTriSphere`].
-/// 
+///
 /// This is a [`crate::Sphere`] with equilateral triangular faces. There are effectively
 /// three topologically distinct implementations of this trait:
 ///  * `BaseTetraSphere` (**TODO**)
 ///  * `BaseOctoSphere` (**TODO**)
 ///  * [`BaseIcoSphere`](crate::ico::BaseIcoSphere)
 #[allow(private_bounds)]
-pub trait BaseSphere: crate::Sphere + Eq + Clone + BaseSphereInternal {
-
-}
+pub trait BaseSphere: crate::Sphere + Eq + Clone + BaseSphereInternal {}
 
 /// Internal trait for [`BaseSphere`].
-/// 
+///
 /// This is a [`crate::Sphere`] whose faces are triangular, which also assigns an "owner" (face) to
 /// each vertex and edge, subject to the following rules:
 ///  * Every vertex and edge is owned by exactly one face.
@@ -41,6 +39,13 @@ pub trait BaseSphere: crate::Sphere + Eq + Clone + BaseSphereInternal {
 pub(crate) trait BaseSphereInternal: crate::Sphere + Eq + Clone {
     /// The type of [`BaseRegion`] for this base shape.
     type Region: BaseRegion<Face = Self::Face>;
+
+    /// The angle, in radians, subtended by any edge of this base shape.
+    fn edge_angle(&self) -> f64;
+
+    /// The cosine of the angle subtended by any edge of this base shape. This is also
+    /// the dot product between any two connected vertices.
+    fn edge_cos_angle(&self) -> f64;
 
     /// Indicates whether the given face owns its first vertex.
     fn face_owns_vertex_0(&self, face: Self::Face) -> bool;
@@ -64,10 +69,6 @@ pub(crate) trait BaseSphereInternal: crate::Sphere + Eq + Clone {
 
     /// Gets the [`BaseRegion`] after the given one.
     fn next_region(&self, region: Self::Region) -> Option<Self::Region>;
-
-    // TODO: Remove
-    #[allow(missing_docs)]
-    fn interpolate(&self, weights: [f64; 3]) -> [f64; 3];
 }
 
 /// Identifies a region of a [`BaseSphere`] which can contain faces and vertices of a
@@ -753,7 +754,7 @@ impl<Base: BaseSphere> SubTriSphere<Base> {
                 face.vertex(1).pos(),
                 face.vertex(2).pos(),
             ],
-            self.base.interpolate(weights),
+            interpolate(self.base.edge_angle(), self.base.edge_cos_angle(), weights)
         )
     }
 }
@@ -930,4 +931,44 @@ impl<Base: BaseSphere> Iterator for VertexIter<Base> {
             }
         }
     }
+}
+
+/// Interpolation function for a base face.
+///
+/// Suppose the vertices of a base face are `v₀`, `v₁`, and `v₂`. The angle between any pair
+/// of these vertices is given by `angle` and `cos_angle` is the cosine of that angle.
+/// 
+/// The interpolation function is given weights `w₀`, `w₁`, and `w₂` such that `wᵢ ≥ 0` and
+/// `w₀ + w₁ + w₂ = 1`. It will compute an approximation of the "spherical" interpolation of the
+/// three vertices with respect to the given weights, `r = c₀ v₀ + c₁ v₁ + c₂ v₂` and return the
+/// coefficients `[c₀, c₁, c₂]`.
+///
+/// It is guaranteed that:
+///  * `r` is on the unit sphere
+///  * If `wᵢ` is `1`, `cᵢ` will also be `1`.
+///
+/// See [this paper](https://mathweb.ucsd.edu/~sbuss/ResearchWeb/spheremean/paper.pdf) for
+/// a precise definition of spherical interpolation (which we only approximate here, for
+/// performance reasons).
+fn interpolate(angle: f64, cos_angle: f64, weights: [f64; 3]) -> [f64; 3] {
+    let [w_0, w_1, w_2] = weights;
+
+    // Compute initial unnormalized coefficients. `cᵢ = (wᵢ * angle).sin()` assures that this
+    // behaves like a perfect SLERP (https://en.wikipedia.org/wiki/Slerp) when one of
+    // the weights is `0`.
+    // TODO: it might be possible to create a faster implementation of `(x * angle).sin()`.
+    // This could also make the result portable, since `sin` isn't.
+    let c_0 = (w_0 * angle).sin();
+    let c_1 = (w_1 * angle).sin();
+    let c_2 = (w_2 * angle).sin();
+
+    // Normalize coefficients such that, when applied to the 3 vertices of the base face,
+    // the result will be on the unit sphere
+    let norm_sqr =
+        c_0 * c_0 + c_1 * c_1 + c_2 * c_2 + 2.0 * cos_angle * (c_0 * c_1 + c_1 * c_2 + c_2 * c_0);
+    let norm = norm_sqr.sqrt();
+    let c_0 = c_0 / norm;
+    let c_1 = c_1 / norm;
+    let c_2 = c_2 / norm;
+    [c_0, c_1, c_2]
 }

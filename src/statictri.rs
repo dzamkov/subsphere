@@ -10,6 +10,8 @@ use crate::subtri::{BaseRegion, BaseRegionType, BaseSphere, BaseSphereInternal};
 pub struct StaticTriSphere<const F: usize, const V: usize> {
     verts: [[f64; 3]; V],
     indices: [[u8; 3]; F],
+    edge_angle: f64,
+    edge_cos_angle: f64,
     adjacent: [[u8; 3]; F],
     vert_owner: [u8; V],
     owns_vert_0: u64,
@@ -21,7 +23,12 @@ impl<const F: usize, const V: usize> StaticTriSphere<F, V> {
     ///
     /// This will validate that the data describes a valid [`BaseSphere`]. If it doesn't, this will
     /// panic.
-    pub const fn new(verts: [[f64; 3]; V], indices: [[u8; 3]; F]) -> Self {
+    pub const fn new(
+        verts: [[f64; 3]; V],
+        indices: [[u8; 3]; F],
+        edge_angle: f64,
+        edge_cos_angle: f64,
+    ) -> Self {
         assert!(F < 64, "too many faces");
         assert!(V < 64, "too many vertices");
 
@@ -120,6 +127,8 @@ impl<const F: usize, const V: usize> StaticTriSphere<F, V> {
         Self {
             verts,
             indices,
+            edge_angle,
+            edge_cos_angle,
             adjacent,
             vert_owner,
             owns_vert_0,
@@ -173,6 +182,14 @@ impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>
 {
     type Region = Region<F, V, S>;
 
+    fn edge_angle(&self) -> f64 {
+        self.0.as_ref().edge_angle
+    }
+
+    fn edge_cos_angle(&self) -> f64 {
+        self.0.as_ref().edge_cos_angle
+    }
+
     fn face_owns_vertex_0(&self, face: Self::Face) -> bool {
         let sphere = self.0.as_ref();
         (sphere.owns_vert_0 >> face.index) & 1 == 1
@@ -225,10 +242,6 @@ impl<const F: usize, const V: usize, S: Eq + Clone + AsRef<StaticTriSphere<F, V>
             }
         }
         Some(region)
-    }
-
-    fn interpolate(&self, _: [f64; 3]) -> [f64; 3] {
-        unimplemented!()
     }
 }
 
