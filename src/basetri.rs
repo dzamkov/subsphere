@@ -1,0 +1,435 @@
+//! Contains types related to [`BaseTriSphere`].
+use crate::math::Vector3;
+
+/// A tessellation of the unit sphere constructed by projecting a triangular platonic solid
+/// onto it.
+#[repr(u8)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
+pub enum BaseTriSphere {
+    /// A tessellation of the unit sphere constructed by projecting an icosahedron onto it.
+    #[default]
+    Icosa = 0,
+    /// A tessellation of the unit sphere constructed by projecting an octohedron onto it.
+    Octo = 1,
+    /// A tessellation of the unit sphere constructed by projecting a tetrahedron onto it.
+    Tetra = 2,
+}
+
+impl BaseTriSphere {
+    /// The angle, in radians, subtended by any edge of this base shape.
+    pub fn edge_angle(self) -> f64 {
+        [1.1071487177940904, std::f64::consts::FRAC_PI_2][self as usize]
+    }
+
+    /// The cosine of the angle, in radians, subtended by any edge of this base shape.
+    ///
+    /// This is also the dot product between any two connected vertices.
+    pub fn edge_cos_angle(self) -> f64 {
+        [C_1, 0.0][self as usize]
+    }
+
+    /// The internal representation of the first face of this base shape.
+    pub(crate) fn first_face_inner(self) -> u8 {
+        self.lookup::<0, 20, 28>()
+    }
+
+    /// One more than the internal representation of the last face of this base shape.
+    pub(crate) fn last_face_inner(self) -> u8 {
+        self.lookup::<20, 28, 32>()
+    }
+
+    /// The internal representation of the first vertex of this base shape.
+    pub(crate) fn first_vertex_inner(self) -> u8 {
+        self.lookup::<0, 12, 18>()
+    }
+
+    /// One more than the internal representation of the last vertex of this base shape.
+    pub(crate) fn last_vertex_inner(self) -> u8 {
+        self.lookup::<12, 18, 22>()
+    }
+
+    /// Returns the constant value corresponding to this base shape.
+    const fn lookup<const ICOSA: u8, const OCTO: u8, const TETRA: u8>(self) -> u8 {
+        ((((TETRA as u32) << 16) | ((OCTO as u32) << 8) | ICOSA as u32) >> (self as u32 * 8)) as u8
+    }
+}
+
+impl crate::Sphere for BaseTriSphere {
+    type Face = Face;
+    type Vertex = Vertex;
+    type HalfEdge = HalfEdge;
+
+    fn num_faces(&self) -> usize {
+        self.lookup::<20, 8, 4>() as usize
+    }
+
+    fn face(&self, index: usize) -> Face {
+        assert!(index < self.num_faces(), "index out of bounds");
+        Face(self.first_face_inner() + index as u8)
+    }
+
+    fn faces(&self) -> impl Iterator<Item = Face> {
+        (self.first_face_inner()..self.last_face_inner()).map(Face)
+    }
+
+    fn num_vertices(&self) -> usize {
+        self.lookup::<12, 6, 4>() as usize
+    }
+
+    fn vertex(&self, index: usize) -> Self::Vertex {
+        assert!(index < self.num_vertices(), "index out of bounds");
+        Vertex(self.first_vertex_inner() + index as u8)
+    }
+
+    fn vertices(&self) -> impl Iterator<Item = Vertex> {
+        (self.first_vertex_inner()..self.last_vertex_inner()).map(Vertex)
+    }
+}
+
+/// A face of a [`BaseTriSphere`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Face(pub(crate) u8);
+
+impl Face {
+    /// Gets the [`BaseTriSphere`] this face belongs to.
+    pub fn sphere(self) -> BaseTriSphere {
+        unsafe { std::mem::transmute(self.0.saturating_sub(12) / 8) }
+    }
+
+    /// Indicates whether this face [owns](OwnershipInfo) its second vertex.
+    pub(crate) fn owns_vertex_1(self) -> bool {
+        OWNERSHIP.owns_vert_1 & (1 << self.0) != 0
+    }
+
+    /// Indicates whether this face [owns](OwnershipInfo) its third edge.
+    pub(crate) fn owns_edge_2(self) -> bool {
+        OWNERSHIP.owns_edge_2 & (1 << self.0) != 0
+    }
+
+    /// Gets the number of vertices that are owned by the faces preceding this face in
+    /// iteration order, not counting the first vertex of the shape.
+    pub(crate) fn num_owned_vertices_before(self) -> usize {
+        let start = self.sphere().first_face_inner();
+        let before_mask = (1u32 << self.0) - 1;
+        ((OWNERSHIP.owns_vert_1 & before_mask) >> start).count_ones() as usize
+    }
+
+    /// Gets the number of edges that are owned by the faces preceding this face in iteration
+    /// order.
+    pub(crate) fn num_owned_edges_before(self) -> usize {
+        let start = self.sphere().first_face_inner();
+        let index = self.0 - start;
+        let before_mask = (1u32 << self.0) - 1;
+        index as usize + ((OWNERSHIP.owns_edge_2 & before_mask) >> start).count_ones() as usize
+    }
+}
+
+impl crate::Face for Face {
+    type Vertex = Vertex;
+    type HalfEdge = HalfEdge;
+
+    fn index(&self) -> usize {
+        (self.0 - self.sphere().first_face_inner()) as usize
+    }
+
+    fn num_sides(&self) -> usize {
+        3
+    }
+
+    fn side(&self, index: usize) -> HalfEdge {
+        assert!(index < self.num_sides(), "index out of bounds");
+        HalfEdge((self.0 << 2) | index as u8)
+    }
+}
+
+/// A vertex of a [`BaseTriSphere`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Vertex(u8);
+
+impl Vertex {
+    /// Gets the [`BaseTriSphere`] this vertex belongs to.
+    pub fn sphere(self) -> BaseTriSphere {
+        unsafe { std::mem::transmute(self.0.saturating_sub(6) / 6) }
+    }
+
+    /// Gets the face which [owns](OwnershipInfo) this vertex.
+    pub(crate) fn owner(self) -> Face {
+        Face(OWNERSHIP.vert_owner[self.0 as usize])
+    }
+}
+
+impl crate::Vertex for Vertex {
+    type Face = Face;
+    type HalfEdge = HalfEdge;
+
+    fn index(&self) -> usize {
+        (self.0 - self.sphere().first_vertex_inner()) as usize
+    }
+
+    fn pos(&self) -> [f64; 3] {
+        VERTS[self.0 as usize]
+    }
+
+    fn degree(&self) -> usize {
+        todo!()
+    }
+
+    fn first_outgoing(&self) -> HalfEdge {
+        todo!()
+    }
+}
+
+/// A half-edge of a [`BaseTriSphere`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct HalfEdge(u8);
+
+impl crate::HalfEdge for HalfEdge {
+    type Face = Face;
+    type Vertex = Vertex;
+
+    fn index(&self) -> usize {
+        (self.0 & 0b11) as usize
+    }
+
+    fn inside(&self) -> Face {
+        Face(self.0 >> 2)
+    }
+
+    fn start(&self) -> Vertex {
+        Vertex(unsafe {
+            *INDICES
+                .get_unchecked(self.inside().0 as usize)
+                .get_unchecked(self.index())
+        })
+    }
+
+    fn complement(&self) -> Self {
+        HalfEdge(unsafe {
+            *COMPLEMENT
+                .get_unchecked(self.inside().0 as usize)
+                .get_unchecked(self.index())
+        })
+    }
+
+    fn prev(&self) -> Self {
+        todo!()
+    }
+
+    fn next(&self) -> Self {
+        todo!()
+    }
+}
+
+/// Provides information about the "ownership" relationships between faces, edges, and vertices.
+///
+/// The rules for ownership are as follows:
+///  * Every vertex and edge is owned by exactly one face.
+///  * Faces must own their first edge.
+///  * Faces may own their third edge.
+///  * The first face in a [`BaseTriSphere`] must own its first vertex, which must be the first
+///    vertex in the [`BaseTriSphere`].
+///  * Faces may own their second vertex.
+struct OwnershipInfo {
+    vert_owner: [u8; NUM_VERTS],
+    owns_vert_1: u32,
+    owns_edge_2: u32,
+}
+
+/// Provides information about the "ownership" relationships between faces, edges, and vertices.
+static OWNERSHIP: OwnershipInfo = const {
+    // Assign ownership of first vertex in each shape
+    let mut vert_owner: [u8; NUM_VERTS] = [u8::MAX; NUM_VERTS];
+    vert_owner[0] = 0;
+    vert_owner[12] = 20;
+
+    // Assign ownership of each vertex to the first face that contains it as it's 1 vertex
+    let mut owns_vert_1 = 0;
+    let mut i = 0;
+    while i < NUM_FACES {
+        let v_1 = INDICES[i][1] as usize;
+        if vert_owner[v_1] == u8::MAX {
+            vert_owner[v_1] = i as u8;
+            owns_vert_1 |= 1 << i;
+        }
+        i += 1;
+    }
+
+    // Verify that every vertex has an owner
+    let mut j = 0;
+    while j < NUM_VERTS {
+        assert!(vert_owner[j] != u8::MAX, "vertex does not have an owner");
+        j += 1;
+    }
+
+    // Assign ownership of each edge. First by edge 0, then optionally by edge 2.
+    let mut edge_has_owner: [[bool; NUM_VERTS]; NUM_VERTS] = [[false; NUM_VERTS]; NUM_VERTS];
+    let mut num_owned_edges = 0;
+    let mut i = 0;
+    while i < NUM_FACES {
+        let v_0 = INDICES[i][0] as usize;
+        let v_1 = INDICES[i][1] as usize;
+        let edge_has_owner = if v_0 < v_1 {
+            &mut edge_has_owner[v_0][v_1]
+        } else {
+            &mut edge_has_owner[v_1][v_0]
+        };
+        assert!(!*edge_has_owner, "edge already has an owner");
+        *edge_has_owner = true;
+        num_owned_edges += 1;
+        i += 1;
+    }
+    let mut owns_edge_2 = 0;
+    let mut i = 0;
+    while i < NUM_FACES {
+        let v_2 = INDICES[i][2] as usize;
+        let v_0 = INDICES[i][0] as usize;
+        let edge_has_owner = if v_0 < v_2 {
+            &mut edge_has_owner[v_0][v_2]
+        } else {
+            &mut edge_has_owner[v_2][v_0]
+        };
+        if !*edge_has_owner {
+            *edge_has_owner = true;
+            num_owned_edges += 1;
+            owns_edge_2 |= 1 << i;
+        }
+        i += 1;
+    }
+
+    // Verify that every edge has an owner
+    assert!(
+        num_owned_edges == NUM_FACES * 3 / 2,
+        "not all edges have an owner"
+    );
+
+    // Finalize ownership info
+    OwnershipInfo {
+        vert_owner,
+        owns_vert_1,
+        owns_edge_2,
+    }
+};
+
+/// Table used to implement [`crate::HalfEdge::complement`].
+static COMPLEMENT: [[u8; 3]; NUM_FACES] = const {
+    // Build adjacent mapping for potential edges
+    let mut adjacent: [[u8; NUM_VERTS]; NUM_VERTS] = [[u8::MAX; NUM_VERTS]; NUM_VERTS];
+    let mut i = 0;
+    while i < NUM_FACES {
+        let v_0 = INDICES[i][0] as usize;
+        let v_1 = INDICES[i][1] as usize;
+        let v_2 = INDICES[i][2] as usize;
+        assert!(adjacent[v_0][v_1] == u8::MAX, "duplicate edge detected");
+        assert!(adjacent[v_1][v_2] == u8::MAX, "duplicate edge detected");
+        assert!(adjacent[v_2][v_0] == u8::MAX, "duplicate edge detected");
+        adjacent[v_0][v_1] = (i as u8) << 2;
+        adjacent[v_1][v_2] = ((i as u8) << 2) | 1;
+        adjacent[v_2][v_0] = ((i as u8) << 2) | 2;
+        i += 1;
+    }
+
+    // Convert to adjacency table for faces
+    let mut res: [[u8; 3]; NUM_FACES] = [[u8::MAX; 3]; NUM_FACES];
+    i = 0;
+    while i < NUM_FACES {
+        let v_0 = INDICES[i][0] as usize;
+        let v_1 = INDICES[i][1] as usize;
+        let v_2 = INDICES[i][2] as usize;
+        assert!(adjacent[v_1][v_0] != u8::MAX, "hanging edge detected");
+        assert!(adjacent[v_2][v_1] != u8::MAX, "hanging edge detected");
+        assert!(adjacent[v_0][v_2] != u8::MAX, "hanging edge detected");
+        res[i][0] = adjacent[v_1][v_0];
+        res[i][1] = adjacent[v_2][v_1];
+        res[i][2] = adjacent[v_0][v_2];
+        i += 1;
+    }
+    res
+};
+
+/// The total number of vertices across all [`BaseTriSphere`]s.
+const NUM_VERTS: usize = 12 + 6;
+
+/// The total number of faces across all [`BaseTriSphere`]s.
+const NUM_FACES: usize = 20 + 8;
+
+/// The vertex position data for all potential vertices on a [`BaseTriSphere`].
+static VERTS: [Vector3; NUM_VERTS] = [
+    // Icosahedron top apex
+    [0.0, 0.0, 1.0],
+    // Icosahedron top ring
+    [C_0, 0.0, C_1],
+    [C_2, C_3, C_1],
+    [-C_4, C_5, C_1],
+    [-C_4, -C_5, C_1],
+    [C_2, -C_3, C_1],
+    // Icosahedron bottom ring
+    [C_4, -C_5, -C_1],
+    [C_4, C_5, -C_1],
+    [-C_2, C_3, -C_1],
+    [-C_0, 0.0, -C_1],
+    [-C_2, -C_3, -C_1],
+    // Icosahedron bottom apex
+    [0.0, 0.0, -1.0],
+    // Octohedron
+    [0.0, 0.0, 1.0],
+    [1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [-1.0, 0.0, 0.0],
+    [0.0, -1.0, 0.0],
+    [0.0, 0.0, -1.0],
+];
+
+/// The face index data for all potential faces on a [`BaseTriSphere`].
+static INDICES: [[u8; 3]; NUM_FACES] = [
+    // Icosahedron top cap
+    [0, 1, 2],
+    [0, 2, 3],
+    [0, 3, 4],
+    [0, 4, 5],
+    [0, 5, 1],
+    // Icosahedron central ring
+    [5, 6, 1],
+    [6, 7, 1],
+    [1, 7, 2],
+    [7, 8, 2],
+    [2, 8, 3],
+    [8, 9, 3],
+    [3, 9, 4],
+    [9, 10, 4],
+    [4, 10, 5],
+    [10, 6, 5],
+    // Icosahedron bottom cap
+    [10, 11, 6],
+    [6, 11, 7],
+    [7, 11, 8],
+    [8, 11, 9],
+    [9, 11, 10],
+    // Octohedron top cap
+    [12, 13, 14],
+    [12, 14, 15],
+    [12, 15, 16],
+    [12, 16, 13],
+    // Octohedron bottom cap
+    [16, 17, 13],
+    [13, 17, 14],
+    [14, 17, 15],
+    [15, 17, 16],
+];
+
+/// `sqrt(4 / 5)`
+const C_0: f64 = 0.8944271909999159;
+
+/// `sqrt(1 / 5)`
+const C_1: f64 = 0.4472135954999579;
+
+/// `(5 - sqrt(5)) / 10`
+const C_2: f64 = 0.276393202250021;
+
+/// `sqrt((5 + sqrt(5)) / 10)`
+const C_3: f64 = 0.8506508083520399;
+
+/// `(5 + sqrt(5)) / 10`
+const C_4: f64 = 0.7236067977499789;
+
+/// `sqrt((5 - sqrt(5)) / 10)`
+const C_5: f64 = 0.5257311121191336;

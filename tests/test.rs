@@ -1,10 +1,10 @@
 use std::num::NonZero;
 
-use subsphere::{Face, Sphere, Vertex};
+use subsphere::{BaseTriSphere, Face, Sphere, SubTriSphere, Vertex};
 
 #[test]
 fn test_octosphere_base() {
-    let sphere = subsphere::OctoSphere::base();
+    let sphere = SubTriSphere::from(BaseTriSphere::Octo);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     insta::assert_snapshot!(area_discrepancy(sphere), @"1");
@@ -12,7 +12,7 @@ fn test_octosphere_base() {
 
 #[test]
 fn test_octosphere_4_0() {
-    let sphere = subsphere::OctoSphere::new(NonZero::new(4).unwrap(), 0);
+    let sphere = SubTriSphere::new(BaseTriSphere::Octo, NonZero::new(4).unwrap(), 0);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     insta::assert_snapshot!(area_discrepancy(sphere), @"1.5543100839896127");
@@ -20,7 +20,7 @@ fn test_octosphere_4_0() {
 
 #[test]
 fn test_octosphere_3_1() {
-    let sphere = subsphere::OctoSphere::new(NonZero::new(3).unwrap(), 1);
+    let sphere = SubTriSphere::new(BaseTriSphere::Octo, NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     insta::assert_snapshot!(area_discrepancy(sphere), @"2.0639513819660484");
@@ -28,7 +28,7 @@ fn test_octosphere_3_1() {
 
 #[test]
 fn test_octosphere_2_2() {
-    let sphere = subsphere::OctoSphere::new(NonZero::new(2).unwrap(), 2);
+    let sphere = SubTriSphere::new(BaseTriSphere::Octo, NonZero::new(2).unwrap(), 2);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     insta::assert_snapshot!(area_discrepancy(sphere), @"1.8256604848025586");
@@ -36,7 +36,7 @@ fn test_octosphere_2_2() {
 
 #[test]
 fn test_icosphere_base() {
-    let sphere = subsphere::IcoSphere::base();
+    let sphere = SubTriSphere::from(BaseTriSphere::Icosa);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     assert_eq!(area_discrepancy(sphere), 1.0);
@@ -44,7 +44,7 @@ fn test_icosphere_base() {
 
 #[test]
 fn test_icosphere_4_0() {
-    let sphere = subsphere::IcoSphere::new(NonZero::new(4).unwrap(), 0);
+    let sphere = SubTriSphere::new(BaseTriSphere::Icosa, NonZero::new(4).unwrap(), 0);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     insta::assert_snapshot!(area_discrepancy(sphere), @"1.1643667123353725");
@@ -52,7 +52,7 @@ fn test_icosphere_4_0() {
 
 #[test]
 fn test_icosphere_3_1() {
-    let sphere = subsphere::IcoSphere::new(NonZero::new(3).unwrap(), 1);
+    let sphere = SubTriSphere::new(BaseTriSphere::Icosa, NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     insta::assert_snapshot!(area_discrepancy(sphere), @"1.2728314137602617");
@@ -60,7 +60,7 @@ fn test_icosphere_3_1() {
 
 #[test]
 fn test_icosphere_2_2() {
-    let sphere = subsphere::IcoSphere::new(NonZero::new(2).unwrap(), 2);
+    let sphere = SubTriSphere::new(BaseTriSphere::Icosa, NonZero::new(2).unwrap(), 2);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
     insta::assert_snapshot!(area_discrepancy(sphere), @"1.2111118117451836");
@@ -95,7 +95,7 @@ fn validate(sphere: impl Sphere) {
 }
 
 /// The area of the largest face on the given [`Sphere`] divided by the area of the smallest face.
-/// 
+///
 /// Smaller values indicate a more uniform distribution of face areas, which is desirable.
 fn area_discrepancy(sphere: impl Sphere) -> f64 {
     let mut min_area = f64::MAX;

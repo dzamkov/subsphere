@@ -2,15 +2,12 @@
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 mod math;
-mod statictri;
 
-pub mod ico;
-pub mod octo;
+pub mod basetri;
 pub mod subtri;
 
+pub use basetri::BaseTriSphere;
 pub use subtri::SubTriSphere;
-pub use octo::{OctoSphere, BaseOctoSphere};
-pub use ico::{IcoSphere, BaseIcoSphere};
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
 pub trait Sphere {
@@ -26,11 +23,17 @@ pub trait Sphere {
     /// The number of faces on this sphere.
     fn num_faces(&self) -> usize;
 
+    /// Gets the [`Face`] with the given [`index`](Face::index).
+    fn face(&self, index: usize) -> Self::Face;
+
     /// Iterates over the faces of this sphere.
     fn faces(&self) -> impl Iterator<Item = Self::Face>;
 
     /// The number of vertices on this sphere.
     fn num_vertices(&self) -> usize;
+
+    /// Gets the [`Vertex`] with the given [`index`](Vertex::index).
+    fn vertex(&self, index: usize) -> Self::Vertex;
 
     /// Iterates over the vertices of this sphere.
     fn vertices(&self) -> impl Iterator<Item = Self::Vertex>;
