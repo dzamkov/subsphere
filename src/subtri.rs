@@ -264,76 +264,19 @@ impl Vertex {
     /// This will normalize the vertex `region` to be its proper owner.
     fn new(sphere: SubTriSphere, region: BaseRegion, u: u32, v: u32) -> Self {
         if region.ty().is_edge() {
-            if u == 0 {
-                if v == 0 {
-                    Self::base(sphere, region.owner().vertex(0))
-                } else if v == sphere.c() && sphere.b() == sphere.c() {
-                    if region.ty() == BaseRegionType::Edge0 {
-                        Self::center(sphere, region.owner())
-                    } else {
-                        Self::center(sphere, region.owner().side(2).complement().inside())
-                    }
-                } else if region.owner().owns_edge_2() {
-                    if region.ty() == BaseRegionType::Edge0 {
-                        Self {
-                            sphere,
-                            region: BaseRegion::new(region.owner(), BaseRegionType::Edge2),
-                            u: v,
-                            v: 0,
-                        }
-                    } else {
-                        let adj = region.owner().side(2).complement();
-                        debug_assert_eq!(adj.index(), 1);
-                        Self {
-                            sphere,
-                            region: BaseRegion::new(adj.inside(), BaseRegionType::Edge0),
-                            u: sphere.b() - v,
-                            v: sphere.c(),
-                        }
-                    }
-                } else {
-                    debug_assert_eq!(region.ty(), BaseRegionType::Edge0);
-                    let adj = region.owner().side(2).complement();
-
-                    // With the current base layout, if a base face doesn't own its edge 2,
-                    // it will be the edge 0 of the adjacent face that owns it.
-                    debug_assert_eq!(adj.index(), 0);
-                    Self {
-                        sphere,
-                        region: BaseRegion::new(adj.inside(), BaseRegionType::Edge0),
-                        u: v,
-                        v: 0,
-                    }
-                }
+            let edge = if region.ty() == BaseRegionType::Edge0 {
+                region.owner().side(0)
+            } else {
+                region.owner().side(2).complement()
+            };
+            if v == 0 {
+                Self::on_edge_u_boundary(sphere, edge, u)
+            } else if u == 0 {
+                Self::on_edge_v_boundary(sphere, edge, v)
+            } else if v == sphere.c() {
+                Self::on_edge_u_boundary(sphere, edge.complement(), sphere.b() - u)
             } else if u == sphere.b() {
-                if v == 0 && sphere.b() == sphere.c() {
-                    if region.ty() == BaseRegionType::Edge0 {
-                        Self::center(sphere, region.owner().side(0).complement().inside())
-                    } else {
-                        Self::center(sphere, region.owner())
-                    }
-                } else if region.ty() == BaseRegionType::Edge0 {
-                    if v == sphere.c() {
-                        Self::base(sphere, region.owner().vertex(1))
-                    } else {
-                        let adj = region.owner().side(0).complement();
-                        if adj.index() == 1 {
-                            Self {
-                                sphere,
-                                region: BaseRegion::new(adj.inside(), BaseRegionType::Edge0),
-                                u: sphere.b() - sphere.c() + v,
-                                v: sphere.c(),
-                            }
-                        } else {
-                            debug_assert_eq!(adj.index(), 2);
-                            Self::adjacent_1(sphere, adj.inside(), (sphere.b() - sphere.c()) + v)
-                        }
-                    }
-                } else if v == sphere.c() {
-                    Self::base(sphere, region.owner().vertex(2))
-                } else {
-                    Self::adjacent_1(sphere, region.owner(), (sphere.b() - sphere.c()) + v)
-                }
+                Self::on_edge_v_boundary(sphere, edge.complement(), sphere.c() - v)
             } else {
                 Self {
                     sphere,
@@ -342,56 +285,15 @@ impl Vertex {
                     v,
                 }
             }
+        } else if v == 0 {
+            Self::on_interior_boundary(sphere, region.owner().side(0), u)
         } else {
             let n = sphere.b() - sphere.c();
-            if u + v >= n {
+            if u == 0 {
+                Self::on_interior_boundary(sphere, region.owner().side(2), n - v)
+            } else if u + v >= n {
                 debug_assert_eq!(u + v, n);
-                if n == 0 {
-                    todo!()
-                } else if v == 0 {
-                    if sphere.c() == 0 {
-                        Self::base(sphere, region.owner().vertex(1))
-                    } else {
-                        Self {
-                            sphere,
-                            region: BaseRegion::new(region.owner(), BaseRegionType::Edge0),
-                            u,
-                            v: sphere.c(),
-                        }
-                    }
-                } else if u == 0 && sphere.c() == 0 {
-                    Self::base(sphere, region.owner().vertex(2))
-                } else {
-                    Self::adjacent_1(sphere, region.owner(), v)
-                }
-            } else if u == 0 {
-                if v == 0 && sphere.c() == 0 {
-                    Self::base(sphere, region.owner().vertex(0))
-                } else {
-                    let region = if region.owner().owns_edge_2() {
-                        BaseRegion::new(region.owner(), BaseRegionType::Edge2)
-                    } else {
-                        let adj = region.owner().side(2).complement();
-
-                        // With the current base layout, if a base face doesn't own its edge 2,
-                        // it will be the edge 0 of the adjacent face that owns it.
-                        debug_assert_eq!(adj.index(), 0);
-                        BaseRegion::new(adj.inside(), BaseRegionType::Edge0)
-                    };
-                    Self {
-                        sphere,
-                        region,
-                        u: sphere.c() + v,
-                        v: 0,
-                    }
-                }
-            } else if v == 0 {
-                Self {
-                    sphere,
-                    region: BaseRegion::new(region.owner(), BaseRegionType::Edge0),
-                    u,
-                    v: sphere.c(),
-                }
+                Self::on_interior_boundary(sphere, region.owner().side(1), v)
             } else {
                 Self {
                     sphere,
@@ -403,26 +305,80 @@ impl Vertex {
         }
     }
 
-    /// Constructs a [`Vertex`] on the edge 1 border of the given base face.
-    ///
-    /// `r` is the height of the vertex above `face`'s vertex 1. The caller must ensure
-    /// `0 < r < b`.
-    fn adjacent_1(sphere: SubTriSphere, face: BaseFace, r: u32) -> Self {
-        let adj = face.side(1).complement();
-        if adj.index() == 0 {
-            Self {
-                sphere,
-                region: BaseRegion::new(adj.inside(), BaseRegionType::Edge0),
-                u: sphere.b() - r,
-                v: 0,
+    /// Constructs a [`Vertex`] on the bottom (V = 0) boundary of an interior region.
+    fn on_interior_boundary(sphere: SubTriSphere, bottom: BaseHalfEdge, u: u32) -> Self {
+        Self::on_edge_u_boundary(sphere, bottom.complement(), sphere.b() - u)
+    }
+
+    /// Constructs a [`Vertex`] on the V (U = 0) boundary of an edge region.
+    fn on_edge_v_boundary(sphere: SubTriSphere, edge: BaseHalfEdge, v: u32) -> Self {
+        Self::on_edge_u_boundary(sphere, edge.prev().complement(), v)
+    }
+
+    /// Constructs a [`Vertex`] on the U (V = 0) boundary of an edge region.
+    fn on_edge_u_boundary(sphere: SubTriSphere, edge: BaseHalfEdge, u: u32) -> Self {
+        if u == sphere.b() {
+            // In the special case where `b == c`, it's the interior region which owns the
+            // central vertex.
+            if sphere.b() == sphere.c() {
+                Self::center(sphere, edge.complement().inside())
+            } else {
+                Self::on_edge_u_boundary_exclusive(
+                    sphere,
+                    edge.complement().prev().complement(),
+                    sphere.c(),
+                )
             }
         } else {
-            debug_assert_eq!(adj.index(), 2);
-            Self {
-                sphere,
-                region: BaseRegion::new(adj.inside(), BaseRegionType::Edge2),
-                u: r,
-                v: sphere.c(),
+            Self::on_edge_u_boundary_exclusive(sphere, edge, u)
+        }
+    }
+
+    /// Constructs a [`Vertex`] on the U (V = 0) boundary of an edge region when it is guaranteed
+    /// that `u` is not `b`.
+    fn on_edge_u_boundary_exclusive(sphere: SubTriSphere, edge: BaseHalfEdge, u: u32) -> Self {
+        if u == 0 {
+            Self::base(sphere, edge.start())
+        } else {
+            let comp = match edge.index() {
+                0 => {
+                    return Self {
+                        sphere,
+                        region: BaseRegion::new(edge.inside(), BaseRegionType::Edge0),
+                        u,
+                        v: 0,
+                    };
+                }
+                1 => edge.complement(),
+                _ => {
+                    if edge.inside().owns_edge_2() {
+                        return Self {
+                            sphere,
+                            region: BaseRegion::new(edge.inside(), BaseRegionType::Edge2),
+                            u: sphere.b() - u,
+                            v: sphere.c(),
+                        };
+                    } else {
+                        edge.complement()
+                    }
+                }
+            };
+            if comp.index() == 0 {
+                Self {
+                    sphere,
+                    region: BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
+                    u: sphere.b() - u,
+                    v: sphere.c(),
+                }
+            } else {
+                debug_assert_eq!(comp.index(), 2);
+                debug_assert!(comp.inside().owns_edge_2());
+                Self {
+                    sphere,
+                    region: BaseRegion::new(comp.inside(), BaseRegionType::Edge2),
+                    u,
+                    v: 0,
+                }
             }
         }
     }
