@@ -1,36 +1,40 @@
-//! Contains types related to [`HexaSphere`].
+//! Contains types related to [`HexSphere`].
 use crate::Face as FaceExt;
 use crate::Vertex as VertexExt;
 use crate::HalfEdge as HalfEdgeExt;
-use crate::subtri::{self, BaseRegion, BaseRegionType, SubTriSphere};
+use crate::tri::{self, BaseRegion, BaseRegionType, TriSphere};
 use std::num::NonZero;
 
 /// A tessellation of the unit sphere into *mostly* hexagonal [`Face`]s, constructed by grouping
-/// triangles of a [`SubTriSphere`].
+/// triangles of a [`TriSphere`].
+/// 
+/// Equivalently, this is a tessellation formed by projecting a
+/// [Goldberg polyhedron](https://en.wikipedia.org/wiki/Goldberg_polyhedron) onto
+/// the sphere.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct HexaSphere {
-    kis: SubTriSphere,
+pub struct HexSphere {
+    kis: TriSphere,
 }
 
-impl SubTriSphere {
+impl TriSphere {
     /// [Truncates](https://en.wikipedia.org/wiki/Truncation_(geometry)) the vertices of this
-    /// [`SubTriSphere`] to create a [`HexaSphere`].
+    /// [`TriSphere`] to create a [`HexSphere`].
     ///
     /// This will convert all existing faces into hexagons, and create a new face at each vertex.
-    pub fn truncate(self) -> HexaSphere {
-        HexaSphere {
+    pub fn truncate(self) -> HexSphere {
+        HexSphere {
             kis: self.subdivide_edge(NonZero::new(3).unwrap()),
         }
     }
 }
 
-impl HexaSphere {
-    /// Attempts to construct a [`HexaSphere`] whose [`kis`](HexaSphere::kis) is the given
-    /// [`SubTriSphere`].
+impl HexSphere {
+    /// Attempts to construct a [`HexSphere`] whose [`kis`](HexSphere::kis) is the given
+    /// [`TriSphere`].
     ///
-    /// For this to succeed, the [`SubTriSphere`] parameters must satisfy `b % 3 == c % 3`.
+    /// For this to succeed, the [`TriSphere`] parameters must satisfy `b % 3 == c % 3`.
     /// This will return [`None`] otherwise.
-    pub fn new(kis: SubTriSphere) -> Option<Self> {
+    pub fn new(kis: TriSphere) -> Option<Self> {
         if (kis.b() + 2 * kis.c()) % 3 == 0 {
             Some(Self { kis })
         } else {
@@ -40,14 +44,14 @@ impl HexaSphere {
 
     /// Performs the
     /// [kis](https://en.wikipedia.org/wiki/Conway_polyhedron_notation#Original_operations)
-    /// operation on this [`HexaSphere`].
+    /// operation on this [`HexSphere`].
     ///
-    /// This creates a [`Face`](crate::Face) for each [`HalfEdge`] in the [`SubTriSphere`].
-    pub fn kis(self) -> SubTriSphere {
+    /// This creates a [`Face`](crate::Face) for each [`HalfEdge`] in the [`TriSphere`].
+    pub fn kis(self) -> TriSphere {
         self.kis
     }
 
-    /// [`SubTriSphere::num_divisions`] for the dual of this [`HexaSphere`].
+    /// [`TriSphere::num_divisions`] for the dual of this [`HexSphere`].
     const fn dual_num_divisions(&self) -> usize {
         let b = self.kis.b() as usize;
         let c = self.kis.c() as usize;
@@ -141,7 +145,7 @@ fn test_num_faces_on_interior() {
     }
 }
 
-impl crate::Sphere for HexaSphere {
+impl crate::Sphere for HexSphere {
     type Face = Face;
     type Vertex = Vertex;
     type HalfEdge = HalfEdge;
@@ -184,22 +188,22 @@ impl crate::Sphere for HexaSphere {
     }
 }
 
-/// Represents a face on a [`HexaSphere`].
+/// Represents a face on a [`HexSphere`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Face {
-    center: subtri::Vertex,
+    center: tri::Vertex,
 }
 
 impl Face {
     /// Constructs a [`Face`] from the given central vertex.
-    fn new(center: subtri::Vertex) -> Self {
+    fn new(center: tri::Vertex) -> Self {
         debug_assert!(center.u % 3 == center.v % 3);
         Self { center }
     }
 
-    /// The [`HexaSphere`] that this [`Face`] belongs to.
-    pub fn sphere(self) -> HexaSphere {
-        HexaSphere {
+    /// The [`HexSphere`] that this [`Face`] belongs to.
+    pub fn sphere(self) -> HexSphere {
+        HexSphere {
             kis: self.center.sphere,
         }
     }
@@ -244,22 +248,22 @@ impl crate::Face for Face {
     }
 }
 
-/// Represents a vertex on a [`HexaSphere`].
+/// Represents a vertex on a [`HexSphere`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Vertex {
-    kis: subtri::Vertex,
+    kis: tri::Vertex,
 }
 
 impl Vertex {
     /// Constructs a [`Vertex`] from the given [`subtri::Vertex`].
-    fn new(kis: subtri::Vertex) -> Self {
+    fn new(kis: tri::Vertex) -> Self {
         debug_assert!((kis.u + kis.v * 2) % 3 != 0);
         Self { kis }
     }
 
-    /// The [`HexaSphere`] that this [`Vertex`] belongs to.
-    pub fn sphere(self) -> HexaSphere {
-        HexaSphere {
+    /// The [`HexSphere`] that this [`Vertex`] belongs to.
+    pub fn sphere(self) -> HexSphere {
+        HexSphere {
             kis: self.kis.sphere,
         }
     }
@@ -297,10 +301,10 @@ impl crate::Vertex for Vertex {
     }
 }
 
-/// Represents one "side" of an edge on a [`HexaSphere`].
+/// Represents one "side" of an edge on a [`HexSphere`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HalfEdge {
-    kis: subtri::HalfEdge,
+    kis: tri::HalfEdge,
 }
 
 impl crate::HalfEdge for HalfEdge {
@@ -334,7 +338,7 @@ impl crate::HalfEdge for HalfEdge {
     }
 }
 
-impl HexaSphere {
+impl HexSphere {
     /// Gets the index of the first face which is owned by the given base region,
     /// not counting the one corresponding to the first vertex of the base shape.
     fn base_face_index(&self, region: BaseRegion) -> usize {
@@ -362,8 +366,8 @@ impl HexaSphere {
     }
 }
 
-impl HexaSphere {
-    /// Iterates over the faces of this [`HexaSphere`], starting with the given region.
+impl HexSphere {
+    /// Iterates over the faces of this [`HexSphere`], starting with the given region.
     fn faces_from(&self, region: BaseRegion) -> FaceIter {
         if region.ty().is_edge() {
             FaceIter {
@@ -396,10 +400,10 @@ impl HexaSphere {
     }
 }
 
-/// An iterator over the faces of an [`SubTriSphere`].
+/// An iterator over the faces of an [`TriSphere`].
 #[derive(Clone, Debug)]
 pub struct FaceIter {
-    sphere: HexaSphere,
+    sphere: HexSphere,
     region: BaseRegion,
     u: u32,
     u_end: u32,
@@ -411,7 +415,7 @@ impl Iterator for FaceIter {
     fn next(&mut self) -> Option<Face> {
         loop {
             if self.u < self.u_end {
-                let res = Face::new(subtri::Vertex {
+                let res = Face::new(tri::Vertex {
                     sphere: self.sphere.kis,
                     region: self.region,
                     u: self.u,
@@ -428,7 +432,7 @@ impl Iterator for FaceIter {
                     && self.region.ty() == BaseRegionType::Edge0
                     && self.region.owner().owns_vertex_1()
                 {
-                    let res = Face::new(subtri::Vertex {
+                    let res = Face::new(tri::Vertex {
                         sphere: self.sphere.kis,
                         region: self.region,
                         u: self.u,
@@ -456,8 +460,8 @@ impl Iterator for FaceIter {
     }
 }
 
-impl HexaSphere {
-    /// Iterates over the vertices of this [`HexaSphere`], starting with the given region.
+impl HexSphere {
+    /// Iterates over the vertices of this [`HexSphere`], starting with the given region.
     fn vertices_from(&self, region: BaseRegion) -> VertexIter {
         if region.ty().is_edge() {
             VertexIter {
@@ -482,10 +486,10 @@ impl HexaSphere {
     }
 }
 
-/// An iterator over the vertices of an [`HexaSphere`].
+/// An iterator over the vertices of an [`HexSphere`].
 #[derive(Clone, Debug)]
 pub struct VertexIter {
-    sphere: HexaSphere,
+    sphere: HexSphere,
     region: BaseRegion,
     u: u32,
     u_end: u32,
@@ -498,7 +502,7 @@ impl Iterator for VertexIter {
     fn next(&mut self) -> Option<Vertex> {
         loop {
             if self.u < self.u_end {
-                let res = Vertex::new(subtri::Vertex {
+                let res = Vertex::new(tri::Vertex {
                     sphere: self.sphere.kis,
                     region: self.region,
                     u: self.u,

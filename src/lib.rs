@@ -4,29 +4,29 @@
 mod math;
 
 pub mod basetri;
-pub mod subtri;
+pub mod tri;
 pub mod hex;
 
 pub use basetri::BaseTriSphere;
-pub use subtri::SubTriSphere;
-pub use hex::HexaSphere;
+pub use tri::TriSphere;
+pub use hex::HexSphere;
 
 use std::num::NonZero;
 
 /// Constructs a tessellation of the unit sphere by projecting an icosahedron onto it.
 /// 
-/// The tessellation can be refined by calling methods such as [`SubTriSphere::subdivide_edge`] or
-/// [`SubTriSphere::truncate`].
-pub fn icosphere() -> SubTriSphere {
-    SubTriSphere::new(BaseTriSphere::Icosa, NonZero::new(1).unwrap(), 0)
+/// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
+/// [`TriSphere::truncate`].
+pub fn icosphere() -> TriSphere {
+    TriSphere::new(BaseTriSphere::Icosa, NonZero::new(1).unwrap(), 0)
 }
 
 /// Constructs a tessellation of the unit sphere by projecting an octohedron onto it.
 /// 
-/// The tessellation can be refined by calling methods such as [`SubTriSphere::subdivide_edge`] or
-/// [`SubTriSphere::truncate`].
-pub fn octosphere() -> SubTriSphere {
-    SubTriSphere::new(BaseTriSphere::Octo, NonZero::new(1).unwrap(), 0)
+/// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
+/// [`TriSphere::truncate`].
+pub fn octosphere() -> TriSphere {
+    TriSphere::new(BaseTriSphere::Octo, NonZero::new(1).unwrap(), 0)
 }
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).

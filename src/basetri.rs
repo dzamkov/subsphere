@@ -196,7 +196,7 @@ impl crate::Vertex for Vertex {
 pub struct HalfEdge(u8);
 
 impl HalfEdge {
-    /// The index of this half-edge within the [`Face::sides`] list of its
+    /// The index of this half-edge within the [`sides`](crate::Face::sides) list of its
     /// [`inside`](HalfEdge::inside).
     pub const fn side_index(self) -> usize {
         (self.0 & 0b11) as usize
