@@ -1,6 +1,5 @@
 //! Contains types related to [`SubTriSphere`].
 use crate::Face as FaceExt;
-use crate::HalfEdge as HalfEdgeExt;
 use crate::Sphere as SphereExt;
 use crate::Vertex as VertexExt;
 use crate::basetri::BaseTriSphere;
@@ -8,7 +7,7 @@ use crate::basetri::Face as BaseFace;
 use crate::basetri::HalfEdge as BaseHalfEdge;
 use crate::basetri::Vertex as BaseVertex;
 use crate::math::{self, Scalar, Vector3, mat3, vec3};
-use std::num::NonZeroU32;
+use std::num::NonZero;
 
 /// A tessellation of the unit sphere into triangular [`Face`]s constructed by subdividing a
 /// triangular platonic solid and projecting it onto the sphere.
@@ -17,7 +16,7 @@ use std::num::NonZeroU32;
 /// [geodesic polyhedron](https://en.wikipedia.org/wiki/Geodesic_polyhedron).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SubTriSphere {
-    b: NonZeroU32,
+    b: NonZero<u32>,
     c_base: u32,
 }
 
@@ -29,45 +28,48 @@ impl SubTriSphere {
     /// simplicity and performance, only `b ≥ c` polyhedra are directly supported. `b < c`
     /// polyhedra can be emulated by swapping the `b` and `c` parameters and mirroring the
     /// resulting sphere.
-    pub fn new(base: BaseTriSphere, b: NonZeroU32, c: u32) -> Self {
+    pub const fn new(base: BaseTriSphere, b: NonZero<u32>, c: u32) -> Self {
         assert!(
             b.get() < u32::MAX >> 2,
-            "b exceeds maxmimum subdivision size. b = {}",
-            b
+            "b exceeds maxmimum subdivision size"
         );
-        assert!(
-            b.get() >= c,
-            "b must be greater than or equal to c. b = {}, c = {}",
-            b,
-            c
-        );
+        assert!(b.get() >= c, "b must be greater than or equal to c");
         Self {
             b,
             c_base: (c << 2) | base as u32,
         }
     }
 
+    /// Subdivides each edge of this [`SubTriSphere`] into the given number of segments.
+    pub const fn subdivide_edge(&self, divs: NonZero<u32>) -> Self {
+        Self::new(
+            self.base(),
+            self.b.checked_mul(divs).expect("arithmetic overflow"),
+            self.c() * divs.get(),
+        )
+    }
+
     /// The base shape of this subdivided sphere.
-    pub fn base(&self) -> BaseTriSphere {
+    pub const fn base(&self) -> BaseTriSphere {
         unsafe { std::mem::transmute((self.c_base & 0b11) as u8) }
     }
 
     /// The `b` parameter of the subdivision, as described
     /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
-    pub fn b(&self) -> u32 {
+    pub const fn b(&self) -> u32 {
         self.b.get()
     }
 
     /// The `c` parameter of the subdivision, as described
     /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation).
-    pub fn c(&self) -> u32 {
+    pub const fn c(&self) -> u32 {
         self.c_base >> 2
     }
 
     /// The number of [`Face`]s each triangle on the base shape is subdivided into.
     ///
     /// This is also known as the "triangulation number" of the shape.
-    pub fn num_divisions(&self) -> usize {
+    pub const fn num_divisions(&self) -> usize {
         let b = self.b() as usize;
         let c = self.c() as usize;
         b * (b + c) + c * c
@@ -88,14 +90,14 @@ impl SubTriSphere {
 
     /// The number of vertices per edge [`BaseRegion`], assuming that the origin vertex is not
     /// counted.
-    fn num_vertices_per_edge_region(&self) -> usize {
+    pub(crate) fn num_vertices_per_edge_region(&self) -> usize {
         let b = self.b() as usize;
         let c = self.c() as usize;
         (b - 1) * (c + 1)
     }
 
     /// The number of vertices per interior [`BaseRegion`].
-    fn num_vertices_per_interior_region(&self) -> usize {
+    pub(crate) fn num_vertices_per_interior_region(&self) -> usize {
         let n = (self.b() - self.c()) as isize;
         // Yes, this really should return `1` when `n = 0`.
         ((n - 1) * (n - 2) / 2) as usize
@@ -104,7 +106,7 @@ impl SubTriSphere {
 
 impl From<BaseTriSphere> for SubTriSphere {
     fn from(base: BaseTriSphere) -> Self {
-        Self::new(base, NonZeroU32::new(1).unwrap(), 0)
+        Self::new(base, NonZero::new(1).unwrap(), 0)
     }
 }
 
@@ -146,7 +148,7 @@ impl crate::Sphere for SubTriSphere {
     }
 }
 
-/// Represents a face in an [`SubTriSphere`].
+/// Represents a face on a [`SubTriSphere`].
 ///
 /// This is always a geodesic triangle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -246,16 +248,16 @@ impl Face {
 /// Represents a vertex in an [`SubTriSphere`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Vertex {
-    sphere: SubTriSphere,
+    pub(crate) sphere: SubTriSphere,
 
     /// The [`BaseRegion`] which "owns" this vertex.
-    region: BaseRegion,
+    pub(crate) region: BaseRegion,
 
     /// The U coordinate of this vertex, specified in the local coordinate space of `region`.
-    u: u32,
+    pub(crate) u: u32,
 
     /// The V coordinate of this vertex, specified in the local coordinate space of `region`.
-    v: u32,
+    pub(crate) v: u32,
 }
 
 impl Vertex {
@@ -264,19 +266,16 @@ impl Vertex {
     /// This will normalize the vertex `region` to be its proper owner.
     fn new(sphere: SubTriSphere, region: BaseRegion, u: u32, v: u32) -> Self {
         if region.ty().is_edge() {
-            let edge = if region.ty() == BaseRegionType::Edge0 {
-                region.owner().side(0)
-            } else {
-                region.owner().side(2).complement()
-            };
             if v == 0 {
-                Self::on_edge_u_boundary(sphere, edge, u)
+                Self::on_edge_u_boundary(sphere, region.as_edge(), u)
             } else if u == 0 {
-                Self::on_edge_v_boundary(sphere, edge, v)
-            } else if v == sphere.c() {
-                Self::on_edge_u_boundary(sphere, edge.complement(), sphere.b() - u)
-            } else if u == sphere.b() {
-                Self::on_edge_v_boundary(sphere, edge.complement(), sphere.c() - v)
+                Self::on_edge_v_boundary(sphere, region.as_edge(), v)
+            } else if v >= sphere.c() {
+                debug_assert_eq!(v, sphere.c());
+                Self::on_edge_u_boundary(sphere, region.as_edge().complement(), sphere.b() - u)
+            } else if u >= sphere.b() {
+                debug_assert_eq!(u, sphere.b());
+                Self::on_edge_v_boundary(sphere, region.as_edge().complement(), sphere.c() - v)
             } else {
                 Self {
                     sphere,
@@ -340,7 +339,7 @@ impl Vertex {
         if u == 0 {
             Self::base(sphere, edge.start())
         } else {
-            let comp = match edge.index() {
+            let comp = match edge.side_index() {
                 0 => {
                     return Self {
                         sphere,
@@ -363,7 +362,7 @@ impl Vertex {
                     }
                 }
             };
-            if comp.index() == 0 {
+            if comp.side_index() == 0 {
                 Self {
                     sphere,
                     region: BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
@@ -371,7 +370,7 @@ impl Vertex {
                     v: sphere.c(),
                 }
             } else {
-                debug_assert_eq!(comp.index(), 2);
+                debug_assert_eq!(comp.side_index(), 2);
                 debug_assert!(comp.inside().owns_edge_2());
                 Self {
                     sphere,
@@ -414,6 +413,32 @@ impl Vertex {
             }
         }
     }
+
+    /// Determines whether this vertex corresponds to a [`BaseVertex`] and if so, returns it.
+    pub fn as_base(&self) -> Option<BaseVertex> {
+        match self.region.ty() {
+            BaseRegionType::Edge0 => {
+                if self.u == 0 {
+                    debug_assert_eq!(self.v, 0);
+                    Some(self.region.owner().vertex(0))
+                } else if self.u == self.sphere.b() {
+                    debug_assert_eq!(self.v, self.sphere.c());
+                    Some(self.region.owner().vertex(1))
+                } else {
+                    None
+                }
+            }
+            BaseRegionType::Edge2 => {
+                if self.u == self.sphere.b() {
+                    debug_assert_eq!(self.v, self.sphere.c());
+                    Some(self.region.owner().vertex(2))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 impl crate::Vertex for Vertex {
@@ -443,11 +468,18 @@ impl crate::Vertex for Vertex {
     }
 
     fn degree(&self) -> usize {
-        if self.u == 0 && self.v == 0 { 5 } else { 6 }
+        todo!()
     }
 
-    fn first_outgoing(&self) -> HalfEdge {
-        todo!()
+    fn outgoing(&self, index: usize) -> HalfEdge {
+        HalfEdge::new(
+            self.sphere,
+            self.region,
+            self.u,
+            self.v,
+            HalfEdgeDir::from_index(index),
+        )
+        .unwrap_or_else(|base| HalfEdge::base(self.sphere, base.outgoing(index)))
     }
 }
 
@@ -471,7 +503,7 @@ pub struct HalfEdge {
 
 /// Identifies a possible direction of a half-edge with respect to its [`BaseFace`].
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum HalfEdgeDir {
     /// The +U direction.
     Up = 0,
@@ -492,11 +524,239 @@ enum HalfEdgeDir {
     UpVn = 5,
 }
 
+impl HalfEdge {
+    /// Attempts to construct a [`HalfEdge`] with the given properties, normalizing
+    /// `region` to be its proper owner.
+    ///
+    /// This requires `(start_u, start_v)` to be a valid coordinate in the given `region`. This
+    /// will fail if `(start_u, start_v)` is a base vertex, in which case the base vertex will be
+    /// returned.
+    fn new(
+        sphere: SubTriSphere,
+        region: BaseRegion,
+        start_u: u32,
+        start_v: u32,
+        dir: HalfEdgeDir,
+    ) -> Result<Self, BaseVertex> {
+        if region.ty().is_edge() {
+            if start_v == 0 {
+                Self::on_edge_u_boundary(sphere, region.as_edge(), start_u, dir)
+            } else if start_u == 0 {
+                Self::on_edge_v_boundary(sphere, region.as_edge(), start_v, dir)
+            } else if start_v >= sphere.c() {
+                debug_assert_eq!(start_v, sphere.c());
+                Self::on_edge_u_boundary(
+                    sphere,
+                    region.as_edge().complement(),
+                    sphere.b() - start_u,
+                    dir,
+                )
+            } else if start_u >= sphere.b() {
+                debug_assert_eq!(start_u, sphere.b());
+                Self::on_edge_v_boundary(
+                    sphere,
+                    region.as_edge().complement(),
+                    sphere.c() - start_v,
+                    dir,
+                )
+            } else {
+                Ok(Self {
+                    sphere,
+                    region,
+                    start_u,
+                    start_v,
+                    dir,
+                })
+            }
+        } else if start_v == 0 {
+            Self::on_interior_boundary(sphere, region.owner().side(0), start_u, dir)
+        } else {
+            let n = sphere.b() - sphere.c();
+            if start_u == 0 {
+                Self::on_interior_boundary(sphere, region.owner().side(2), n - start_v, dir)
+            } else if start_u + start_v >= n {
+                debug_assert_eq!(start_u + start_v, n);
+                Self::on_interior_boundary(sphere, region.owner().side(1), start_v, dir)
+            } else {
+                Ok(Self {
+                    sphere,
+                    region,
+                    start_u,
+                    start_v,
+                    dir,
+                })
+            }
+        }
+    }
+
+    /// Constructs a [`HalfEdge`] on the bottom (V = 0) boundary of an interior region.
+    fn on_interior_boundary(
+        sphere: SubTriSphere,
+        bottom: BaseHalfEdge,
+        start_u: u32,
+        dir: HalfEdgeDir,
+    ) -> Result<Self, BaseVertex> {
+        if start_u == 0 {
+            if sphere.c() == 0 {
+                Err(bottom.start())
+            } else {
+                todo!()
+            }
+        } else {
+            let n = sphere.b() - sphere.c();
+            let in_region = if start_u >= n {
+                debug_assert_eq!(start_u, n);
+                if sphere.c() == 0 {
+                    return Err(bottom.complement().start());
+                }
+                dir == HalfEdgeDir::UnVp
+            } else {
+                dir < HalfEdgeDir::Un
+            };
+            if in_region {
+                let (start_u, start_v, dir) = match bottom.side_index() {
+                    0 => (start_u, 0, dir),
+                    1 => (sphere.b() - start_u, start_u, dir.rotate_ccw(2)),
+                    _ => (0, sphere.b() - start_u, dir.rotate_ccw(4)),
+                };
+                Ok(Self {
+                    sphere,
+                    region: BaseRegion::new(bottom.inside(), BaseRegionType::Interior),
+                    start_u,
+                    start_v,
+                    dir,
+                })
+            } else {
+                Self::on_edge_u_boundary(
+                    sphere,
+                    bottom.complement(),
+                    sphere.b() - start_u,
+                    dir.rotate_ccw(3),
+                )
+            }
+        }
+    }
+
+    /// Constructs a [`HalfEdge`] on the V (U = 0) boundary of an edge region.
+    fn on_edge_v_boundary(
+        sphere: SubTriSphere,
+        edge: BaseHalfEdge,
+        start_v: u32,
+        dir: HalfEdgeDir,
+    ) -> Result<Self, BaseVertex> {
+        todo!()
+    }
+
+    /// Constructs a [`HalfEdge`] on the U (V = 0) boundary of an edge region.
+    fn on_edge_u_boundary(
+        sphere: SubTriSphere,
+        edge: BaseHalfEdge,
+        start_u: u32,
+        dir: HalfEdgeDir,
+    ) -> Result<Self, BaseVertex> {
+        if start_u == 0 {
+            Err(edge.start())
+        } else if sphere.c() == 0 {
+            Self::on_interior_boundary(sphere, edge, start_u, dir)
+        } else if start_u == sphere.b() {
+            todo!()
+        } else if dir < HalfEdgeDir::Un {
+            Ok(Self::on_edge_exclusive(sphere, edge, start_u, 0, dir))
+        } else if start_u <= sphere.c() {
+            Self::on_edge_v_boundary(sphere, edge.complement().next(), start_u, dir.rotate_ccw(1))
+        } else {
+            Self::on_interior_boundary(
+                sphere,
+                edge.complement(),
+                sphere.b() - start_u,
+                dir.rotate_ccw(3),
+            )
+        }
+    }
+
+    /// Constructs a [`HalfEdge`] on an edge region when it is guaranteed that the resulting
+    /// half-edge will belong to the region.
+    fn on_edge_exclusive(
+        sphere: SubTriSphere,
+        edge: BaseHalfEdge,
+        start_u: u32,
+        start_v: u32,
+        dir: HalfEdgeDir,
+    ) -> Self {
+        debug_assert!(sphere.c() > 0);
+        let comp = match edge.side_index() {
+            0 => {
+                return Self {
+                    sphere,
+                    region: BaseRegion::new(edge.inside(), BaseRegionType::Edge0),
+                    start_u,
+                    start_v,
+                    dir,
+                };
+            }
+            1 => edge.complement(),
+            _ => {
+                if edge.inside().owns_edge_2() {
+                    return Self {
+                        sphere,
+                        region: BaseRegion::new(edge.inside(), BaseRegionType::Edge2),
+                        start_u: sphere.b() - start_u,
+                        start_v: sphere.c() - start_v,
+                        dir: dir.rotate_ccw(3),
+                    };
+                } else {
+                    edge.complement()
+                }
+            }
+        };
+        if comp.side_index() == 0 {
+            Self {
+                sphere,
+                region: BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
+                start_u: sphere.b() - start_u,
+                start_v: sphere.c() - start_v,
+                dir: dir.rotate_ccw(3),
+            }
+        } else {
+            debug_assert_eq!(comp.side_index(), 2);
+            debug_assert!(comp.inside().owns_edge_2());
+            Self {
+                sphere,
+                region: BaseRegion::new(comp.inside(), BaseRegionType::Edge2),
+                start_u,
+                start_v,
+                dir,
+            }
+        }
+    }
+
+    /// Constructs a [`HalfEdge`] corresponding to a [`BaseHalfEdge`].
+    fn base(sphere: SubTriSphere, source: BaseHalfEdge) -> Self {
+        if sphere.c() == 0 {
+            // In this case, edge regions do not own any faces, and therefore no half-edges.
+            let (start_u, start_v, dir) = match source.side_index() {
+                0 => (0, 0, HalfEdgeDir::Up),
+                1 => (sphere.b(), 0, HalfEdgeDir::UnVp),
+                _ => (0, sphere.b(), HalfEdgeDir::Vn),
+            };
+            Self {
+                sphere,
+                region: BaseRegion::new(source.inside(), BaseRegionType::Interior),
+                start_u,
+                start_v,
+                dir,
+            }
+        } else {
+            todo!()
+        }
+    }
+}
+
 impl crate::HalfEdge for HalfEdge {
     type Vertex = Vertex;
     type Face = Face;
 
-    fn index(&self) -> usize {
+    fn side_index(&self) -> usize {
         todo!()
     }
 
@@ -520,7 +780,7 @@ impl crate::HalfEdge for HalfEdge {
         let mut start_u = self.start_u;
         let mut start_v = self.start_v;
         self.dir.add_to(&mut start_u, &mut start_v);
-        let dir = self.dir.rotate_ccw_120();
+        let dir = self.dir.rotate_ccw(2);
         HalfEdge {
             sphere: self.sphere,
             region: self.region,
@@ -532,6 +792,14 @@ impl crate::HalfEdge for HalfEdge {
 }
 
 impl HalfEdgeDir {
+    /// Constructs a [`HalfEdgeDir`] from the given index.
+    ///
+    /// This corresponds to an angle of `index * 60` degrees.
+    pub fn from_index(index: usize) -> Self {
+        assert!(index < 6, "index out of bounds: {}", index);
+        unsafe { std::mem::transmute(index as u8) }
+    }
+
     /// Adds this [`HalfEdgeDir`] to the given U and V coordinates.
     pub fn add_to(self, u: &mut u32, v: &mut u32) {
         static TABLE: [(i8, i8); 6] = [
@@ -547,19 +815,13 @@ impl HalfEdgeDir {
         *v = v.wrapping_add_signed(d_v as i32);
     }
 
-    /// Rotates this [`HalfEdgeDir`] 120 degrees counter-clockwise.
-    pub fn rotate_ccw_120(self) -> Self {
-        const TABLE: [HalfEdgeDir; 6] = [
-            HalfEdgeDir::UnVp, // Up
-            HalfEdgeDir::Un,   // Vp
-            HalfEdgeDir::Vn,   // UnVp
-            HalfEdgeDir::UpVn, // Un
-            HalfEdgeDir::Up,   // Vn
-            HalfEdgeDir::Vp,   // UpVn
-        ];
-        TABLE[self as usize]
+    /// Rotates this [`HalfEdgeDir`] counter-clockwise by `amount * 60` degrees.
+    pub fn rotate_ccw(self, amount: usize) -> Self {
+        let index = (self as usize + amount) % 6;
+        unsafe { std::mem::transmute(index as u8) }
     }
 }
+
 impl SubTriSphere {
     /// Gets the index of the first face which is owned by the given base region.
     fn base_face_index(&self, region: BaseRegion) -> usize {
@@ -776,30 +1038,49 @@ impl Iterator for VertexIter {
 /// [`SubTriSphere`].
 ///
 /// There is a region corresponding to each face and edge of a [`BaseTriSphere`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct BaseRegion(u8);
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct BaseRegion(u8);
 
 impl BaseRegion {
     /// Constructs the [`BaseRegion`] for the given face and type.
-    fn new(owner: BaseFace, ty: BaseRegionType) -> Self {
+    pub fn new(owner: BaseFace, ty: BaseRegionType) -> Self {
         BaseRegion((owner.0 << 2) | (ty as u8))
     }
 
     /// Gets the owner of this region.
-    fn owner(&self) -> BaseFace {
+    pub fn owner(&self) -> BaseFace {
         BaseFace(self.0 >> 2)
     }
 
     /// The general type of this [`BaseRegion`].
-    fn ty(&self) -> BaseRegionType {
+    pub fn ty(&self) -> BaseRegionType {
         unsafe { std::mem::transmute(self.0 & 0b11) }
+    }
+
+    /// Assuming that this region is for an edge, gets the edge corresponding to this region. The
+    /// start of the returned edge is the origin of this region.
+    pub fn as_edge(self) -> BaseHalfEdge {
+        if self.ty() == BaseRegionType::Edge0 {
+            self.owner().side(0)
+        } else {
+            self.owner().side(2).complement()
+        }
+    }
+}
+
+impl std::fmt::Debug for BaseRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("BaseRegion::new")
+            .field(&self.owner())
+            .field(&self.ty())
+            .finish()
     }
 }
 
 /// The general type of a [`BaseRegion`].
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BaseRegionType {
+pub(crate) enum BaseRegionType {
     /// Corresponds to the first edge of [`BaseRegion::owner`].
     Edge0 = 0,
 
@@ -819,12 +1100,12 @@ impl BaseRegionType {
 
 impl BaseTriSphere {
     /// Gets the first [`BaseRegion`] of this base shape.
-    fn first_region(self) -> BaseRegion {
+    pub(crate) fn first_region(self) -> BaseRegion {
         BaseRegion::new(self.face(0), BaseRegionType::Edge0)
     }
 
     /// Gets the [`BaseRegion`] after the given one.
-    fn next_region(self, mut region: BaseRegion) -> Option<BaseRegion> {
+    pub(crate) fn next_region(self, mut region: BaseRegion) -> Option<BaseRegion> {
         if region.ty().is_edge() {
             region.0 += 1;
             if (region.0 >> 2) >= self.last_face_inner() {

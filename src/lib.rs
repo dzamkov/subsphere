@@ -5,9 +5,29 @@ mod math;
 
 pub mod basetri;
 pub mod subtri;
+pub mod hex;
 
 pub use basetri::BaseTriSphere;
 pub use subtri::SubTriSphere;
+pub use hex::HexaSphere;
+
+use std::num::NonZero;
+
+/// Constructs a tessellation of the unit sphere by projecting an icosahedron onto it.
+/// 
+/// The tessellation can be refined by calling methods such as [`SubTriSphere::subdivide_edge`] or
+/// [`SubTriSphere::truncate`].
+pub fn icosphere() -> SubTriSphere {
+    SubTriSphere::new(BaseTriSphere::Icosa, NonZero::new(1).unwrap(), 0)
+}
+
+/// Constructs a tessellation of the unit sphere by projecting an octohedron onto it.
+/// 
+/// The tessellation can be refined by calling methods such as [`SubTriSphere::subdivide_edge`] or
+/// [`SubTriSphere::truncate`].
+pub fn octosphere() -> SubTriSphere {
+    SubTriSphere::new(BaseTriSphere::Octo, NonZero::new(1).unwrap(), 0)
+}
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
 pub trait Sphere {
@@ -57,7 +77,16 @@ pub trait Face: Clone + Eq {
     /// This is also known as the [solid angle](https://en.wikipedia.org/wiki/Solid_angle)
     /// subtended by the face. The sum of the areas of all faces on a sphere is `4 π`.
     fn area(&self) -> f64 {
-        todo!()
+        let mut verts = self.vertices();
+        let a = verts.next().unwrap().pos();
+        let mut b = verts.next().unwrap().pos();
+        let mut res = 0.0;
+        for c in verts {
+            let c = c.pos();
+            res += math::sphere_tri_area([a, b, c]);
+            b = c;
+        }
+        res
     }
 
     /// The number of sides (vertices or edges) that this face has.
@@ -76,14 +105,14 @@ pub trait Face: Clone + Eq {
         self.sides().map(|h| h.start())
     }
 
-    /// Gets the [`HalfEdge`] which has the given [`index`](HalfEdge::index) and this face as its
-    /// [`inside`](HalfEdge::inside).
+    /// Gets the [`HalfEdge`] which has the given [`index`](HalfEdge::side_index) and this face as
+    /// its [`inside`](HalfEdge::inside).
     fn side(&self, index: usize) -> Self::HalfEdge;
 
     /// Iterates over the [`HalfEdge`]s which have this face as their [`inside`](HalfEdge::inside).
     ///
     /// Edges will be returned in counter-clockwise order around the face, consistent with
-    /// [`HalfEdge::index`]. The iterator will return [`num_sides`](Face::num_sides) edges.
+    /// [`HalfEdge::side_index`]. The iterator will return [`num_sides`](Face::num_sides) edges.
     fn sides(&self) -> impl Iterator<Item = Self::HalfEdge> {
         (0..self.num_sides()).map(|i| self.side(i))
     }
@@ -106,31 +135,25 @@ pub trait Vertex: Clone + Eq {
     /// The number of edges (or equivalently, [`Face`]s) that are connected to this vertex.
     fn degree(&self) -> usize;
 
-    /// Iterates over the [`Face`]s which are connected to this vertex.
-    fn faces(&self) -> impl Iterator<Item = Self::Face> {
-        self.outgoing().map(|h| h.inside())
+    /// Gets a connected [`Face`] based on its index within the [`Vertex::faces`] list.
+    fn face(&self, index: usize) -> Self::Face {
+        self.outgoing(index).inside()
     }
 
-    /// The first [`HalfEdge`] in [`Vertex::outgoing`].
-    ///
-    /// [`Vertex::outgoing`] must not be empty, so this is often a convenient and performant way
-    /// of getting an arbitrary outgoing half-edge.
-    fn first_outgoing(&self) -> Self::HalfEdge;
+    /// Iterates over the [`Face`]s which are connected to this vertex.
+    fn faces(&self) -> impl Iterator<Item = Self::Face> {
+        self.outgoings().map(|h| h.inside())
+    }
 
-    /// Iterates over the [`HalfEdge`]s which have this vertex as their [`HalfEdge::start`].
-    ///
-    /// Edges will be returned in counter-clockwise order around the vertex, starting with
-    /// [`Vertex::first_outgoing`]. The iterator will return [`Vertex::degree`] edges.
-    ///
-    /// Each returned [`HalfEdge`] corresponding to a [`Face`] which connects to this vertex. These
-    /// faces can be obtained using [`HalfEdge::inside`].
-    fn outgoing(&self) -> impl Iterator<Item = Self::HalfEdge> {
-        let mut h = self.first_outgoing();
-        (0..self.degree()).map(move |_| {
-            let res = h.clone();
-            h = h.prev().complement();
-            res
-        })
+    /// Gets an outgoing [`HalfEdge`] based on its index within the [`Vertex::outgoings`] list.
+    fn outgoing(&self, index: usize) -> Self::HalfEdge;
+
+    /// Iterates over the outgoing [`HalfEdge`]s which have this vertex as their
+    /// [`start`](HalfEdge::start).
+    /// 
+    /// Edges will be returned in counter-clockwise order around the vertex.
+    fn outgoings(&self) -> impl Iterator<Item = Self::HalfEdge> {
+        (0..self.degree()).map(|i| self.outgoing(i))
     }
 }
 
@@ -147,7 +170,7 @@ pub trait HalfEdge: Clone + Eq {
 
     /// The index of this half-edge within the [`Face::sides`] list of its
     /// [`inside`](HalfEdge::inside).
-    fn index(&self) -> usize;
+    fn side_index(&self) -> usize;
 
     /// Gets the [`Face`] whose interior boundary contains this half-edge.
     fn inside(&self) -> Self::Face;

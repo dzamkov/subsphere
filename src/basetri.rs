@@ -16,15 +16,20 @@ pub enum BaseTriSphere {
 }
 
 impl BaseTriSphere {
+    /// The degree of the vertices in this base shape.
+    pub const fn vertex_degree(self) -> usize {
+        self.lookup::<5, 4, 3>() as usize
+    }
+
     /// The angle, in radians, subtended by any edge of this base shape.
-    pub fn edge_angle(self) -> f64 {
+    pub const fn edge_angle(self) -> f64 {
         [1.1071487177940904, std::f64::consts::FRAC_PI_2][self as usize]
     }
 
     /// The cosine of the angle, in radians, subtended by any edge of this base shape.
     ///
     /// This is also the dot product between any two connected vertices.
-    pub fn edge_cos_angle(self) -> f64 {
+    pub const fn edge_cos_angle(self) -> f64 {
         [C_1, 0.0][self as usize]
     }
 
@@ -92,7 +97,7 @@ pub struct Face(pub(crate) u8);
 
 impl Face {
     /// Gets the [`BaseTriSphere`] this face belongs to.
-    pub fn sphere(self) -> BaseTriSphere {
+    pub const fn sphere(self) -> BaseTriSphere {
         unsafe { std::mem::transmute(self.0.saturating_sub(12) / 8) }
     }
 
@@ -122,6 +127,13 @@ impl Face {
         let before_mask = (1u32 << self.0) - 1;
         index as usize + ((OWNERSHIP.owns_edge_2 & before_mask) >> start).count_ones() as usize
     }
+
+    /// Gets the [`HalfEdge`] which has the given [`index`](HalfEdge::side_index) and this face as
+    /// its [`inside`](HalfEdge::inside).
+    const fn side(self, index: usize) -> HalfEdge {
+        assert!(index < 3, "index out of bounds");
+        HalfEdge((self.0 << 2) | index as u8)
+    }
 }
 
 impl crate::Face for Face {
@@ -137,8 +149,7 @@ impl crate::Face for Face {
     }
 
     fn side(&self, index: usize) -> HalfEdge {
-        assert!(index < self.num_sides(), "index out of bounds");
-        HalfEdge((self.0 << 2) | index as u8)
+        (*self).side(index)
     }
 }
 
@@ -148,13 +159,13 @@ pub struct Vertex(u8);
 
 impl Vertex {
     /// Gets the [`BaseTriSphere`] this vertex belongs to.
-    pub fn sphere(self) -> BaseTriSphere {
+    pub const fn sphere(self) -> BaseTriSphere {
         unsafe { std::mem::transmute(self.0.saturating_sub(6) / 6) }
     }
 
     /// Gets the face which [owns](OwnershipInfo) this vertex.
-    pub(crate) fn owner(self) -> Face {
-        Face(OWNERSHIP.vert_owner[self.0 as usize])
+    pub(crate) const fn owner(self) -> Face {
+        OWNERSHIP.vert_owner[self.0 as usize]
     }
 }
 
@@ -171,11 +182,12 @@ impl crate::Vertex for Vertex {
     }
 
     fn degree(&self) -> usize {
-        todo!()
+        self.sphere().vertex_degree()
     }
-
-    fn first_outgoing(&self) -> HalfEdge {
-        todo!()
+    
+    fn outgoing(&self, index: usize) -> HalfEdge {
+        assert!(index < self.degree(), "index out of bounds");
+        OUTGOING[self.0 as usize][index]
     }
 }
 
@@ -183,35 +195,33 @@ impl crate::Vertex for Vertex {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HalfEdge(u8);
 
-impl crate::HalfEdge for HalfEdge {
-    type Face = Face;
-    type Vertex = Vertex;
-
-    fn index(&self) -> usize {
+impl HalfEdge {
+    /// The index of this half-edge within the [`Face::sides`] list of its
+    /// [`inside`](HalfEdge::inside).
+    pub const fn side_index(self) -> usize {
         (self.0 & 0b11) as usize
     }
 
-    fn inside(&self) -> Face {
+    /// Gets the [`Face`] whose interior boundary contains this half-edge.
+    pub const fn inside(self) -> Face {
         Face(self.0 >> 2)
     }
 
-    fn start(&self) -> Vertex {
-        Vertex(unsafe {
-            *INDICES
-                .get_unchecked(self.inside().0 as usize)
-                .get_unchecked(self.index())
-        })
+    /// Gets the [`Vertex`] at the "start" of this half-edge.
+    pub const fn start(self) -> Vertex {
+        Vertex(INDICES[self.inside().0 as usize][self.side_index()])
     }
-
-    fn complement(&self) -> Self {
-        HalfEdge(unsafe {
-            *COMPLEMENT
-                .get_unchecked(self.inside().0 as usize)
-                .get_unchecked(self.index())
-        })
+    
+    /// Gets the complementary half-edge on the opposite side of the edge.
+    ///
+    /// The returned half-edge will go in the opposite direction along the same edge.
+    pub const fn complement(self) -> Self {
+        COMPLEMENT[self.inside().0 as usize][self.side_index()]
     }
-
-    fn prev(&self) -> Self {
+    
+    /// Gets the half-edge which shares the [`inside`](HalfEdge::inside) face of this half-edge and
+    /// precedes it in counter-clockwise order around the face.
+    pub const fn prev(self) -> Self {
         HalfEdge(if self.0 & 0b11 == 0 {
             self.0 + 2
         } else {
@@ -219,7 +229,9 @@ impl crate::HalfEdge for HalfEdge {
         })
     }
 
-    fn next(&self) -> Self {
+    /// Gets the half-edge which shares the [`inside`](HalfEdge::inside) face of this half-edge and
+    /// follows it in counter-clockwise order around the face.
+    pub const fn next(self) -> Self {
         HalfEdge(if self.0 & 0b11 == 2 {
             self.0 - 2
         } else {
@@ -227,6 +239,76 @@ impl crate::HalfEdge for HalfEdge {
         })
     }
 }
+
+impl crate::HalfEdge for HalfEdge {
+    type Face = Face;
+    type Vertex = Vertex;
+
+    fn side_index(&self) -> usize {
+        (*self).side_index()
+    }
+
+    fn inside(&self) -> Face {
+        (*self).inside()
+    }
+
+    fn start(&self) -> Vertex {
+        (*self).start()
+    }
+
+    fn complement(&self) -> Self {
+        (*self).complement()
+    }
+
+    fn prev(&self) -> Self {
+        (*self).prev()
+    }
+
+    fn next(&self) -> Self {
+        (*self).next()
+    }
+}
+
+/// Table used to implement [`crate::Vertex::outgoing`].
+static OUTGOING: [[HalfEdge; 5]; NUM_VERTS] = const {
+    let mut res: [[HalfEdge; 5]; NUM_VERTS] = [[HalfEdge(u8::MAX); 5]; NUM_VERTS];
+    let mut j = 0;
+    while j < NUM_VERTS {
+        let vert = Vertex(j as u8);
+        let owner = vert.owner();
+
+        // Determine a unique first outgoing edge for each vertex
+        let first_outgoing = {
+            let mut k = 0;
+            loop {
+                let edge = owner.side(k);
+                if edge.start().0 == vert.0 {
+                    break edge;
+                }
+                k += 1;
+                if k == 3 {
+                    panic!("owner does not contain vertex");
+                }
+            }
+        };
+
+        // Build outgoing edge list
+        let mut k = 0;
+        let mut outgoing = first_outgoing;
+        loop {
+            res[j][k] = outgoing;
+            k += 1;
+            outgoing = outgoing.prev().complement();
+            assert!(outgoing.start().0 == vert.0, "outgoing edge does not start at vertex");
+            if outgoing.0 == first_outgoing.0 {
+                break;
+            }
+        }
+        assert!(k == Vertex(j as u8).sphere().vertex_degree(), "degree mismatch");
+        j += 1;
+    }
+    res
+};
 
 /// Provides information about the "ownership" relationships between faces, edges, and vertices.
 ///
@@ -238,7 +320,7 @@ impl crate::HalfEdge for HalfEdge {
 ///    vertex in the [`BaseTriSphere`].
 ///  * Faces may own their second vertex.
 struct OwnershipInfo {
-    vert_owner: [u8; NUM_VERTS],
+    vert_owner: [Face; NUM_VERTS],
     owns_vert_1: u32,
     owns_edge_2: u32,
 }
@@ -246,17 +328,17 @@ struct OwnershipInfo {
 /// Provides information about the "ownership" relationships between faces, edges, and vertices.
 static OWNERSHIP: OwnershipInfo = const {
     // Assign ownership of first vertex in each shape
-    let mut vert_owner: [u8; NUM_VERTS] = [u8::MAX; NUM_VERTS];
-    vert_owner[0] = 0;
-    vert_owner[12] = 20;
+    let mut vert_owner: [Face; NUM_VERTS] = [Face(u8::MAX); NUM_VERTS];
+    vert_owner[0] = Face(0);
+    vert_owner[12] = Face(20);
 
     // Assign ownership of each vertex to the first face that contains it as it's 1 vertex
     let mut owns_vert_1 = 0;
     let mut i = 0;
     while i < NUM_FACES {
         let v_1 = INDICES[i][1] as usize;
-        if vert_owner[v_1] == u8::MAX {
-            vert_owner[v_1] = i as u8;
+        if vert_owner[v_1].0 == u8::MAX {
+            vert_owner[v_1] = Face(i as u8);
             owns_vert_1 |= 1 << i;
         }
         i += 1;
@@ -265,7 +347,7 @@ static OWNERSHIP: OwnershipInfo = const {
     // Verify that every vertex has an owner
     let mut j = 0;
     while j < NUM_VERTS {
-        assert!(vert_owner[j] != u8::MAX, "vertex does not have an owner");
+        assert!(vert_owner[j].0 != u8::MAX, "vertex does not have an owner");
         j += 1;
     }
 
@@ -319,7 +401,7 @@ static OWNERSHIP: OwnershipInfo = const {
 };
 
 /// Table used to implement [`crate::HalfEdge::complement`].
-static COMPLEMENT: [[u8; 3]; NUM_FACES] = const {
+static COMPLEMENT: [[HalfEdge; 3]; NUM_FACES] = const {
     // Build adjacent mapping for potential edges
     let mut adjacent: [[u8; NUM_VERTS]; NUM_VERTS] = [[u8::MAX; NUM_VERTS]; NUM_VERTS];
     let mut i = 0;
@@ -337,7 +419,7 @@ static COMPLEMENT: [[u8; 3]; NUM_FACES] = const {
     }
 
     // Convert to adjacency table for faces
-    let mut res: [[u8; 3]; NUM_FACES] = [[u8::MAX; 3]; NUM_FACES];
+    let mut res: [[HalfEdge; 3]; NUM_FACES] = [[HalfEdge(0); 3]; NUM_FACES];
     i = 0;
     while i < NUM_FACES {
         let v_0 = INDICES[i][0] as usize;
@@ -346,9 +428,9 @@ static COMPLEMENT: [[u8; 3]; NUM_FACES] = const {
         assert!(adjacent[v_1][v_0] != u8::MAX, "hanging edge detected");
         assert!(adjacent[v_2][v_1] != u8::MAX, "hanging edge detected");
         assert!(adjacent[v_0][v_2] != u8::MAX, "hanging edge detected");
-        res[i][0] = adjacent[v_1][v_0];
-        res[i][1] = adjacent[v_2][v_1];
-        res[i][2] = adjacent[v_0][v_2];
+        res[i][0] = HalfEdge(adjacent[v_1][v_0]);
+        res[i][1] = HalfEdge(adjacent[v_2][v_1]);
+        res[i][2] = HalfEdge(adjacent[v_0][v_2]);
         i += 1;
     }
     res
