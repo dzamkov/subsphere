@@ -1,5 +1,4 @@
 //! Contains types related to [`BaseTriSphere`].
-use crate::math::Vector3;
 
 /// A tessellation of the unit sphere constructed by projecting a triangular platonic solid
 /// onto it.
@@ -21,15 +20,15 @@ impl BaseTriSphere {
         self.lookup::<5, 4, 3>() as usize
     }
 
-    /// The angle, in radians, subtended by any edge of this base shape.
-    pub const fn edge_angle(self) -> f64 {
+    /// The angle, in radians, between two adjacent vertices of this base shape.
+    pub const fn vertex_angle(self) -> f64 {
         [1.1071487177940904, std::f64::consts::FRAC_PI_2][self as usize]
     }
 
-    /// The cosine of the angle, in radians, subtended by any edge of this base shape.
-    ///
-    /// This is also the dot product between any two connected vertices.
-    pub const fn edge_cos_angle(self) -> f64 {
+    /// The cosine of [`vertex_angle`](BaseTriSphere::vertex_angle`).
+    /// 
+    /// Equivalently, this is the dot product between two adjacent vertices of this base shape.
+    pub const fn vertex_cos_angle(self) -> f64 {
         [C_1, 0.0][self as usize]
     }
 
@@ -130,7 +129,7 @@ impl Face {
 
     /// Gets the [`HalfEdge`] which has the given [`index`](HalfEdge::side_index) and this face as
     /// its [`inside`](HalfEdge::inside).
-    const fn side(self, index: usize) -> HalfEdge {
+    pub const fn side(self, index: usize) -> HalfEdge {
         assert!(index < 3, "index out of bounds");
         HalfEdge((self.0 << 2) | index as u8)
     }
@@ -443,7 +442,7 @@ const NUM_VERTS: usize = 12 + 6;
 const NUM_FACES: usize = 20 + 8;
 
 /// The vertex position data for all potential vertices on a [`BaseTriSphere`].
-static VERTS: [Vector3; NUM_VERTS] = [
+static VERTS: [[f64; 3]; NUM_VERTS] = [
     // Icosahedron top apex
     [0.0, 0.0, 1.0],
     // Icosahedron top ring

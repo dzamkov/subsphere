@@ -1,39 +1,60 @@
 //! This module contains a minimal set of linear algebra types and functions used by this crate.
 
-/// A scalar value.
-pub type Scalar = f64;
-
-/// A three-dimensional vector of [`Scalar`] values.
-pub type Vector3 = [Scalar; 3];
-
-/// A 3x3 matrix of [`Scalar`] values.
-pub(crate) type Matrix3 = [Vector3; 3];
-
-/// Contains functions related to [`Vector3`].
-pub(crate) mod vec3 {
-    use super::*;
-
+/// Contains functions related to vectors.
+pub(crate) mod vec {
     /// Adds `a` to `b`.
     #[inline]
-    pub const fn add(a: Vector3, b: Vector3) -> Vector3 {
-        [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+    pub fn add<const N: usize>(a: [f64; N], b: [f64; N]) -> [f64; N] {
+        let mut res = [0.0; N];
+        for i in 0..N {
+            res[i] = a[i] + b[i];
+        }
+        res
     }
 
-    /// Multiplies a vector by a [`Scalar`].
+    /// Subtracts `b` from `a`.
     #[inline]
-    pub const fn mul(a: Vector3, b: Scalar) -> Vector3 {
-        [a[0] * b, a[1] * b, a[2] * b]
+    pub fn sub<const N: usize>(a: [f64; N], b: [f64; N]) -> [f64; N] {
+        let mut res = [0.0; N];
+        for i in 0..N {
+            res[i] = a[i] - b[i];
+        }
+        res
+    }
+
+    /// Multiplies a vector by a scalar.
+    #[inline]
+    pub fn mul<const N: usize>(a: [f64; N], b: f64) -> [f64; N] {
+        let mut res = [0.0; N];
+        for i in 0..N {
+            res[i] = a[i] * b;
+        }
+        res
+    }
+
+    /// Divides a vector by a scalar.
+    #[inline]
+    pub fn div<const N: usize>(a: [f64; N], b: f64) -> [f64; N] {
+        let mut res = [0.0; N];
+        for i in 0..N {
+            res[i] = a[i] / b;
+        }
+        res
     }
 
     /// Computes the dot product of two vectors.
     #[inline]
-    pub const fn dot(a: Vector3, b: Vector3) -> Scalar {
-        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    pub fn dot<const N: usize>(a: [f64; N], b: [f64; N]) -> f64 {
+        let mut res = 0.0;
+        for i in 0..N {
+            res += a[i] * b[i];
+        }
+        res
     }
 
     /// Computes the cross product of two vectors.
     #[inline]
-    pub const fn cross(a: Vector3, b: Vector3) -> Vector3 {
+    pub fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
         [
             a[1] * b[2] - a[2] * b[1],
             a[2] * b[0] - a[0] * b[2],
@@ -43,37 +64,41 @@ pub(crate) mod vec3 {
 
     /// Normalizes a vector.
     #[inline]
-    pub fn normalize(a: Vector3) -> Vector3 {
+    pub fn normalize<const N: usize>(a: [f64; N]) -> [f64; N] {
         mul(a, 1.0 / dot(a, a).sqrt())
     }
 }
 
-/// Contains functions related to [`Matrix3`].
-pub(crate) mod mat3 {
+/// Contains functions related to matrices.
+pub(crate) mod mat {
     use super::*;
 
     /// Multiplies a matrix with a vector.
     #[inline]
-    pub const fn apply(m: Matrix3, v: Vector3) -> Vector3 {
-        let x = vec3::mul(m[0], v[0]);
-        let y = vec3::mul(m[1], v[1]);
-        let z = vec3::mul(m[2], v[2]);
-        vec3::add(vec3::add(x, y), z)
+    pub fn apply<const N: usize, const M: usize>(
+        mat: [[f64; N]; M],
+        vec: [f64; M],
+    ) -> [f64; N] {
+        let mut res = [0.0; N];
+        for i in 0..M {
+            res = vec::add(res, vec::mul(mat[i], vec[i]));
+        }
+        res
     }
 
     /// Computes the determinant of a matrix.
     #[inline]
-    pub fn det(m: Matrix3) -> Scalar {
-        vec3::dot(m[0], vec3::cross(m[1], m[2]))
+    pub fn det(m: [[f64; 3]; 3]) -> f64 {
+        vec::dot(m[0], vec::cross(m[1], m[2]))
     }
 }
 
 /// Computes the area (or equivalently, the solid angle) of a spherical triangle.
-pub fn sphere_tri_area(points: [Vector3; 3]) -> Scalar {
+pub fn sphere_tri_area(points: [[f64; 3]; 3]) -> f64 {
     // https://www.johndcook.com/blog/2021/11/29/area-of-spherical-triangle/
     let d = 1.0
-        + vec3::dot(points[0], points[1])
-        + vec3::dot(points[1], points[2])
-        + vec3::dot(points[2], points[0]);
-    (mat3::det(points) / d).atan() * 2.0
+        + vec::dot(points[0], points[1])
+        + vec::dot(points[1], points[2])
+        + vec::dot(points[2], points[0]);
+    (mat::det(points) / d).atan() * 2.0
 }

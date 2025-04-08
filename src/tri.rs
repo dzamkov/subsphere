@@ -6,7 +6,7 @@ use crate::basetri::BaseTriSphere;
 use crate::basetri::Face as BaseFace;
 use crate::basetri::HalfEdge as BaseHalfEdge;
 use crate::basetri::Vertex as BaseVertex;
-use crate::math::{self, Scalar, Vector3, mat3, vec3};
+use crate::proj::{self, TriSphereProjection};
 use std::num::NonZero;
 
 /// A tessellation of the unit sphere into triangular [`Face`]s constructed by subdividing a
@@ -15,43 +15,42 @@ use std::num::NonZero;
 /// This subdivision of a platonic solid is also known as a
 /// [geodesic polyhedron](https://en.wikipedia.org/wiki/Geodesic_polyhedron).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TriSphere {
+pub struct TriSphere<Proj> {
+    proj: Proj,
     b: NonZero<u32>,
     c_base: u32,
 }
 
-impl TriSphere {
-    /// Constructs a [`TriSphere`] from the given base shape and subdivision parameters.
+impl<Proj> TriSphere<Proj> {
+    /// Constructs a [`TriSphere`] from the given base shape, projection and subdivision
+    /// parameters.
     ///
     /// The `b` and `c` parameters are as described
     /// [here](https://en.wikipedia.org/wiki/Geodesic_polyhedron#Notation). For implementation
     /// simplicity and performance, only `b ≥ c` polyhedra are directly supported. `b < c`
     /// polyhedra can be emulated by swapping the `b` and `c` parameters and mirroring the
     /// resulting sphere.
-    pub const fn new(base: BaseTriSphere, b: NonZero<u32>, c: u32) -> Self {
+    pub const fn new(base: BaseTriSphere, proj: Proj, b: NonZero<u32>, c: u32) -> Self {
         assert!(
             b.get() < u32::MAX >> 2,
             "b exceeds maxmimum subdivision size"
         );
         assert!(b.get() >= c, "b must be greater than or equal to c");
         Self {
+            proj,
             b,
             c_base: (c << 2) | base as u32,
         }
     }
 
-    /// Subdivides each edge of this [`TriSphere`] into the given number of segments.
-    pub const fn subdivide_edge(&self, divs: NonZero<u32>) -> Self {
-        Self::new(
-            self.base(),
-            self.b.checked_mul(divs).expect("arithmetic overflow"),
-            self.c() * divs.get(),
-        )
-    }
-
     /// The base shape of this subdivided sphere.
     pub const fn base(&self) -> BaseTriSphere {
         unsafe { std::mem::transmute((self.c_base & 0b11) as u8) }
+    }
+
+    /// The [`TriSphereProjection`] for this sphere.
+    pub const fn proj(&self) -> &Proj {
+        &self.proj
     }
 
     /// The `b` parameter of the subdivision, as described
@@ -104,42 +103,54 @@ impl TriSphere {
     }
 }
 
-impl From<BaseTriSphere> for TriSphere {
-    fn from(base: BaseTriSphere) -> Self {
-        Self::new(base, NonZero::new(1).unwrap(), 0)
+impl<Proj: Clone + TriSphereProjection> TriSphere<Proj> {
+    /// Subdivides each edge of this [`TriSphere`] into the given number of segments.
+    pub fn subdivide_edge(&self, divs: NonZero<u32>) -> Self {
+        Self::new(
+            self.base(),
+            self.proj.clone(),
+            self.b.checked_mul(divs).expect("arithmetic overflow"),
+            self.c() * divs.get(),
+        )
     }
 }
 
-impl crate::Sphere for TriSphere {
-    type Face = Face;
-    type Vertex = Vertex;
-    type HalfEdge = HalfEdge;
+impl<Proj: TriSphereProjection + Default> From<BaseTriSphere> for TriSphere<Proj> {
+    fn from(base: BaseTriSphere) -> Self {
+        Self::new(base, Proj::default(), NonZero::new(1).unwrap(), 0)
+    }
+}
+
+impl<Proj: Eq + Clone + TriSphereProjection> crate::Sphere for TriSphere<Proj> {
+    type Face = Face<Proj>;
+    type Vertex = Vertex<Proj>;
+    type HalfEdge = HalfEdge<Proj>;
 
     fn num_faces(&self) -> usize {
         self.num_divisions() * self.base().num_faces()
     }
 
-    fn face(&self, index: usize) -> Face {
+    fn face(&self, index: usize) -> Face<Proj> {
         todo!()
     }
 
     #[allow(refining_impl_trait)]
-    fn faces(&self) -> FaceIter {
-        self.faces_from(self.base().first_region())
+    fn faces(&self) -> FaceIter<Proj> {
+        self.clone().faces_from(self.base().first_region())
     }
 
     fn num_vertices(&self) -> usize {
         self.num_faces() / 2 + 2
     }
 
-    fn vertex(&self, index: usize) -> Vertex {
+    fn vertex(&self, index: usize) -> Vertex<Proj> {
         todo!()
     }
 
     #[allow(refining_impl_trait)]
-    fn vertices(&self) -> VertexIter {
+    fn vertices(&self) -> VertexIter<Proj> {
         VertexIter {
-            sphere: *self,
+            sphere: self.clone(),
             region: self.base().first_region(),
             u: 0,
             u_end: self.b(),
@@ -152,8 +163,8 @@ impl crate::Sphere for TriSphere {
 ///
 /// This is always a geodesic triangle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Face {
-    sphere: TriSphere,
+pub struct Face<Proj> {
+    sphere: TriSphere<Proj>,
 
     /// The [`BaseRegion`] which "owns" this face.
     region: BaseRegion,
@@ -171,9 +182,9 @@ pub struct Face {
     boundary_along_v: bool,
 }
 
-impl crate::Face for Face {
-    type Vertex = Vertex;
-    type HalfEdge = HalfEdge;
+impl<Proj: Eq + Clone + TriSphereProjection> crate::Face for Face<Proj> {
+    type Vertex = Vertex<Proj>;
+    type HalfEdge = HalfEdge<Proj>;
 
     fn index(&self) -> usize {
         if self.region.ty().is_edge() {
@@ -194,18 +205,18 @@ impl crate::Face for Face {
 
     fn area(&self) -> f64 {
         let [[u_0, v_0], [u_1, v_1], [u_2, v_2]] = self.local_coords();
-        let eval = self.sphere.eval().region(self.region);
-        let p_0 = eval.project(u_0 as f64, v_0 as f64);
-        let p_1 = eval.project(u_1 as f64, v_1 as f64);
-        let p_2 = eval.project(u_2 as f64, v_2 as f64);
-        math::sphere_tri_area([p_0, p_1, p_2])
+        let eval = self.sphere.region_proj(self.region);
+        let p_0 = eval.to_sphere([u_0 as f64, v_0 as f64]);
+        let p_1 = eval.to_sphere([u_1 as f64, v_1 as f64]);
+        let p_2 = eval.to_sphere([u_2 as f64, v_2 as f64]);
+        crate::math::sphere_tri_area([p_0, p_1, p_2])
     }
 
     fn num_sides(&self) -> usize {
         3
     }
 
-    fn side(&self, index: usize) -> HalfEdge {
+    fn side(&self, index: usize) -> HalfEdge<Proj> {
         assert!(index < 3, "side index out of bounds: {}", index);
         let (d_u, d_v, dir) = [
             (0, 0, HalfEdgeDir::Up),
@@ -216,7 +227,7 @@ impl crate::Face for Face {
             (-1, 1, HalfEdgeDir::UpVn),
         ][(index << 1) | self.boundary_along_v as usize];
         HalfEdge {
-            sphere: self.sphere,
+            sphere: self.sphere.clone(),
             region: self.region,
             start_u: self.u_0.wrapping_add_signed(d_u),
             start_v: self.v_0.wrapping_add_signed(d_v),
@@ -225,7 +236,7 @@ impl crate::Face for Face {
     }
 }
 
-impl Face {
+impl<Proj> Face<Proj> {
     /// Gets the UV coordinates of the vertices of this face, specified in the local coordinate
     /// space of `region`.
     fn local_coords(&self) -> [[u32; 2]; 3] {
@@ -247,8 +258,8 @@ impl Face {
 
 /// Represents a vertex in an [`TriSphere`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Vertex {
-    pub(crate) sphere: TriSphere,
+pub struct Vertex<Proj> {
+    pub(crate) sphere: TriSphere<Proj>,
 
     /// The [`BaseRegion`] which "owns" this vertex.
     pub(crate) region: BaseRegion,
@@ -260,11 +271,11 @@ pub struct Vertex {
     pub(crate) v: u32,
 }
 
-impl Vertex {
+impl<Proj: Eq + Clone + TriSphereProjection> Vertex<Proj> {
     /// Constructs a [`Vertex`] with the given properties.
     ///
     /// This will normalize the vertex `region` to be its proper owner.
-    fn new(sphere: TriSphere, region: BaseRegion, u: u32, v: u32) -> Self {
+    fn new(sphere: TriSphere<Proj>, region: BaseRegion, u: u32, v: u32) -> Self {
         if region.ty().is_edge() {
             if v == 0 {
                 Self::on_edge_u_boundary(sphere, region.as_edge(), u)
@@ -272,10 +283,12 @@ impl Vertex {
                 Self::on_edge_v_boundary(sphere, region.as_edge(), v)
             } else if v >= sphere.c() {
                 debug_assert_eq!(v, sphere.c());
-                Self::on_edge_u_boundary(sphere, region.as_edge().complement(), sphere.b() - u)
+                let u = sphere.b() - u;
+                Self::on_edge_u_boundary(sphere, region.as_edge().complement(), u)
             } else if u >= sphere.b() {
                 debug_assert_eq!(u, sphere.b());
-                Self::on_edge_v_boundary(sphere, region.as_edge().complement(), sphere.c() - v)
+                let v = sphere.c() - v;
+                Self::on_edge_v_boundary(sphere, region.as_edge().complement(), v)
             } else {
                 Self {
                     sphere,
@@ -305,28 +318,26 @@ impl Vertex {
     }
 
     /// Constructs a [`Vertex`] on the bottom (V = 0) boundary of an interior region.
-    fn on_interior_boundary(sphere: TriSphere, bottom: BaseHalfEdge, u: u32) -> Self {
-        Self::on_edge_u_boundary(sphere, bottom.complement(), sphere.b() - u)
+    fn on_interior_boundary(sphere: TriSphere<Proj>, bottom: BaseHalfEdge, u: u32) -> Self {
+        let u = sphere.b() - u;
+        Self::on_edge_u_boundary(sphere, bottom.complement(), u)
     }
 
     /// Constructs a [`Vertex`] on the V (U = 0) boundary of an edge region.
-    fn on_edge_v_boundary(sphere: TriSphere, edge: BaseHalfEdge, v: u32) -> Self {
+    fn on_edge_v_boundary(sphere: TriSphere<Proj>, edge: BaseHalfEdge, v: u32) -> Self {
         Self::on_edge_u_boundary(sphere, edge.prev().complement(), v)
     }
 
     /// Constructs a [`Vertex`] on the U (V = 0) boundary of an edge region.
-    fn on_edge_u_boundary(sphere: TriSphere, edge: BaseHalfEdge, u: u32) -> Self {
+    fn on_edge_u_boundary(sphere: TriSphere<Proj>, edge: BaseHalfEdge, u: u32) -> Self {
         if u == sphere.b() {
             // In the special case where `b == c`, it's the interior region which owns the
             // central vertex.
             if sphere.b() == sphere.c() {
                 Self::center(sphere, edge.complement().inside())
             } else {
-                Self::on_edge_u_boundary_exclusive(
-                    sphere,
-                    edge.complement().prev().complement(),
-                    sphere.c(),
-                )
+                let u = sphere.c();
+                Self::on_edge_u_boundary_exclusive(sphere, edge.complement().prev().complement(), u)
             }
         } else {
             Self::on_edge_u_boundary_exclusive(sphere, edge, u)
@@ -335,7 +346,7 @@ impl Vertex {
 
     /// Constructs a [`Vertex`] on the U (V = 0) boundary of an edge region when it is guaranteed
     /// that `u` is not `b`.
-    fn on_edge_u_boundary_exclusive(sphere: TriSphere, edge: BaseHalfEdge, u: u32) -> Self {
+    fn on_edge_u_boundary_exclusive(sphere: TriSphere<Proj>, edge: BaseHalfEdge, u: u32) -> Self {
         if u == 0 {
             Self::base(sphere, edge.start())
         } else {
@@ -351,11 +362,13 @@ impl Vertex {
                 1 => edge.complement(),
                 _ => {
                     if edge.inside().owns_edge_2() {
+                        let u = sphere.b() - u;
+                        let v = sphere.c();
                         return Self {
                             sphere,
                             region: BaseRegion::new(edge.inside(), BaseRegionType::Edge2),
-                            u: sphere.b() - u,
-                            v: sphere.c(),
+                            u,
+                            v,
                         };
                     } else {
                         edge.complement()
@@ -363,11 +376,13 @@ impl Vertex {
                 }
             };
             if comp.side_index() == 0 {
+                let u = sphere.b() - u;
+                let v = sphere.c();
                 Self {
                     sphere,
                     region: BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
-                    u: sphere.b() - u,
-                    v: sphere.c(),
+                    u,
+                    v,
                 }
             } else {
                 debug_assert_eq!(comp.side_index(), 2);
@@ -385,7 +400,7 @@ impl Vertex {
     /// Gets the [`Vertex`] at the center of the given base face.
     ///
     /// This is only possible when `b == c`.
-    fn center(sphere: TriSphere, face: BaseFace) -> Self {
+    fn center(sphere: TriSphere<Proj>, face: BaseFace) -> Self {
         debug_assert_eq!(sphere.b(), sphere.c());
         Self {
             sphere,
@@ -396,7 +411,7 @@ impl Vertex {
     }
 
     /// Constructs a [`Vertex`] for one of the base vertices.
-    pub fn base(sphere: TriSphere, source: BaseVertex) -> Self {
+    pub fn base(sphere: TriSphere<Proj>, source: BaseVertex) -> Self {
         if source.index() == 0 {
             Self {
                 sphere,
@@ -405,11 +420,13 @@ impl Vertex {
                 v: 0,
             }
         } else {
+            let u = sphere.b();
+            let v = sphere.c();
             Self {
                 sphere,
                 region: BaseRegion::new(source.owner(), BaseRegionType::Edge0),
-                u: sphere.b(),
-                v: sphere.c(),
+                u,
+                v,
             }
         }
     }
@@ -441,9 +458,9 @@ impl Vertex {
     }
 }
 
-impl crate::Vertex for Vertex {
-    type Face = Face;
-    type HalfEdge = HalfEdge;
+impl<Proj: Eq + Clone + TriSphereProjection> crate::Vertex for Vertex<Proj> {
+    type Face = Face<Proj>;
+    type HalfEdge = HalfEdge<Proj>;
 
     fn index(&self) -> usize {
         if self.region.ty().is_edge() {
@@ -462,31 +479,30 @@ impl crate::Vertex for Vertex {
 
     fn pos(&self) -> [f64; 3] {
         self.sphere
-            .eval()
-            .region(self.region)
-            .project(self.u as f64, self.v as f64)
+            .region_proj(self.region)
+            .to_sphere([self.u as f64, self.v as f64])
     }
 
     fn degree(&self) -> usize {
         todo!()
     }
 
-    fn outgoing(&self, index: usize) -> HalfEdge {
+    fn outgoing(&self, index: usize) -> HalfEdge<Proj> {
         HalfEdge::new(
-            self.sphere,
+            self.sphere.clone(),
             self.region,
             self.u,
             self.v,
             HalfEdgeDir::from_index(index),
         )
-        .unwrap_or_else(|base| HalfEdge::base(self.sphere, base.outgoing(index)))
+        .unwrap_or_else(|base| HalfEdge::base(self.sphere.clone(), base.outgoing(index)))
     }
 }
 
 /// Represents one "side" of an edge in an [`TriSphere`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct HalfEdge {
-    sphere: TriSphere,
+pub struct HalfEdge<Proj> {
+    sphere: TriSphere<Proj>,
 
     /// The [`BaseRegion`] which "owns" this half-edge.
     region: BaseRegion,
@@ -524,7 +540,7 @@ enum HalfEdgeDir {
     UpVn = 5,
 }
 
-impl HalfEdge {
+impl<Proj> HalfEdge<Proj> {
     /// Attempts to construct a [`HalfEdge`] with the given properties, normalizing
     /// `region` to be its proper owner.
     ///
@@ -532,7 +548,7 @@ impl HalfEdge {
     /// will fail if `(start_u, start_v)` is a base vertex, in which case the base vertex will be
     /// returned.
     fn new(
-        sphere: TriSphere,
+        sphere: TriSphere<Proj>,
         region: BaseRegion,
         start_u: u32,
         start_v: u32,
@@ -545,20 +561,12 @@ impl HalfEdge {
                 Self::on_edge_v_boundary(sphere, region.as_edge(), start_v, dir)
             } else if start_v >= sphere.c() {
                 debug_assert_eq!(start_v, sphere.c());
-                Self::on_edge_u_boundary(
-                    sphere,
-                    region.as_edge().complement(),
-                    sphere.b() - start_u,
-                    dir,
-                )
+                let start_u = sphere.b() - start_u;
+                Self::on_edge_u_boundary(sphere, region.as_edge().complement(), start_u, dir)
             } else if start_u >= sphere.b() {
                 debug_assert_eq!(start_u, sphere.b());
-                Self::on_edge_v_boundary(
-                    sphere,
-                    region.as_edge().complement(),
-                    sphere.c() - start_v,
-                    dir,
-                )
+                let start_v = sphere.c() - start_v;
+                Self::on_edge_v_boundary(sphere, region.as_edge().complement(), start_v, dir)
             } else {
                 Ok(Self {
                     sphere,
@@ -591,7 +599,7 @@ impl HalfEdge {
 
     /// Constructs a [`HalfEdge`] on the bottom (V = 0) boundary of an interior region.
     fn on_interior_boundary(
-        sphere: TriSphere,
+        sphere: TriSphere<Proj>,
         bottom: BaseHalfEdge,
         start_u: u32,
         dir: HalfEdgeDir,
@@ -627,10 +635,11 @@ impl HalfEdge {
                     dir,
                 })
             } else {
+                let start_u = sphere.b() - start_u;
                 Self::on_edge_u_boundary(
                     sphere,
                     bottom.complement(),
-                    sphere.b() - start_u,
+                    start_u,
                     dir.rotate_ccw(3),
                 )
             }
@@ -639,7 +648,7 @@ impl HalfEdge {
 
     /// Constructs a [`HalfEdge`] on the V (U = 0) boundary of an edge region.
     fn on_edge_v_boundary(
-        sphere: TriSphere,
+        sphere: TriSphere<Proj>,
         edge: BaseHalfEdge,
         start_v: u32,
         dir: HalfEdgeDir,
@@ -649,7 +658,7 @@ impl HalfEdge {
 
     /// Constructs a [`HalfEdge`] on the U (V = 0) boundary of an edge region.
     fn on_edge_u_boundary(
-        sphere: TriSphere,
+        sphere: TriSphere<Proj>,
         edge: BaseHalfEdge,
         start_u: u32,
         dir: HalfEdgeDir,
@@ -665,10 +674,11 @@ impl HalfEdge {
         } else if start_u <= sphere.c() {
             Self::on_edge_v_boundary(sphere, edge.complement().next(), start_u, dir.rotate_ccw(1))
         } else {
+            let start_u = sphere.b() - start_u;
             Self::on_interior_boundary(
                 sphere,
                 edge.complement(),
-                sphere.b() - start_u,
+                start_u,
                 dir.rotate_ccw(3),
             )
         }
@@ -677,7 +687,7 @@ impl HalfEdge {
     /// Constructs a [`HalfEdge`] on an edge region when it is guaranteed that the resulting
     /// half-edge will belong to the region.
     fn on_edge_exclusive(
-        sphere: TriSphere,
+        sphere: TriSphere<Proj>,
         edge: BaseHalfEdge,
         start_u: u32,
         start_v: u32,
@@ -697,11 +707,13 @@ impl HalfEdge {
             1 => edge.complement(),
             _ => {
                 if edge.inside().owns_edge_2() {
+                    let start_u = sphere.b() - start_u;
+                    let start_v = sphere.c() - start_v;
                     return Self {
                         sphere,
                         region: BaseRegion::new(edge.inside(), BaseRegionType::Edge2),
-                        start_u: sphere.b() - start_u,
-                        start_v: sphere.c() - start_v,
+                        start_u,
+                        start_v,
                         dir: dir.rotate_ccw(3),
                     };
                 } else {
@@ -710,11 +722,13 @@ impl HalfEdge {
             }
         };
         if comp.side_index() == 0 {
+            let start_u = sphere.b() - start_u;
+            let start_v = sphere.c() - start_v;
             Self {
                 sphere,
                 region: BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
-                start_u: sphere.b() - start_u,
-                start_v: sphere.c() - start_v,
+                start_u,
+                start_v,
                 dir: dir.rotate_ccw(3),
             }
         } else {
@@ -731,7 +745,7 @@ impl HalfEdge {
     }
 
     /// Constructs a [`HalfEdge`] corresponding to a [`BaseHalfEdge`].
-    fn base(sphere: TriSphere, source: BaseHalfEdge) -> Self {
+    fn base(sphere: TriSphere<Proj>, source: BaseHalfEdge) -> Self {
         if sphere.c() == 0 {
             // In this case, edge regions do not own any faces, and therefore no half-edges.
             let (start_u, start_v, dir) = match source.side_index() {
@@ -752,37 +766,37 @@ impl HalfEdge {
     }
 }
 
-impl crate::HalfEdge for HalfEdge {
-    type Vertex = Vertex;
-    type Face = Face;
+impl<Proj: Eq + Clone + TriSphereProjection> crate::HalfEdge for HalfEdge<Proj> {
+    type Vertex = Vertex<Proj>;
+    type Face = Face<Proj>;
 
     fn side_index(&self) -> usize {
         todo!()
     }
 
-    fn inside(&self) -> Face {
+    fn inside(&self) -> Face<Proj> {
         todo!()
     }
 
-    fn start(&self) -> Vertex {
-        Vertex::new(self.sphere, self.region, self.start_u, self.start_v)
+    fn start(&self) -> Vertex<Proj> {
+        Vertex::new(self.sphere.clone(), self.region, self.start_u, self.start_v)
     }
 
-    fn complement(&self) -> HalfEdge {
+    fn complement(&self) -> HalfEdge<Proj> {
         todo!()
     }
 
-    fn prev(&self) -> HalfEdge {
+    fn prev(&self) -> HalfEdge<Proj> {
         todo!()
     }
 
-    fn next(&self) -> HalfEdge {
+    fn next(&self) -> HalfEdge<Proj> {
         let mut start_u = self.start_u;
         let mut start_v = self.start_v;
         self.dir.add_to(&mut start_u, &mut start_v);
         let dir = self.dir.rotate_ccw(2);
         HalfEdge {
-            sphere: self.sphere,
+            sphere: self.sphere.clone(),
             region: self.region,
             start_u,
             start_v,
@@ -822,7 +836,7 @@ impl HalfEdgeDir {
     }
 }
 
-impl TriSphere {
+impl<Proj> TriSphere<Proj> {
     /// Gets the index of the first face which is owned by the given base region.
     fn base_face_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
@@ -850,24 +864,26 @@ impl TriSphere {
     }
 }
 
-impl TriSphere {
+impl<Proj> TriSphere<Proj> {
     /// Iterates over the faces of this [`TriSphere`], starting with the given region.
-    fn faces_from(&self, region: BaseRegion) -> FaceIter {
+    fn faces_from(self, region: BaseRegion) -> FaceIter<Proj> {
         if region.ty().is_edge() {
             // If `c` is zero, there are no faces in an edge region. This iterator should
             // immediately go to the next region.
+            let u_0_end = self.b() * (self.c() > 0) as u32;
+            let boundary_along_v = self.c() == 0;
             FaceIter {
-                sphere: *self,
+                sphere: self,
                 region,
                 u_0: 0,
-                u_0_end: self.b() * (self.c() > 0) as u32,
+                u_0_end,
                 v_0: 0,
-                boundary_along_v: self.c() == 0,
+                boundary_along_v,
             }
         } else {
             let n = self.b() - self.c();
             FaceIter {
-                sphere: *self,
+                sphere: self,
                 region,
                 u_0: 0,
                 u_0_end: n,
@@ -880,8 +896,8 @@ impl TriSphere {
 
 /// An iterator over the faces of an [`TriSphere`].
 #[derive(Clone, Debug)]
-pub struct FaceIter {
-    sphere: TriSphere,
+pub struct FaceIter<Proj> {
+    sphere: TriSphere<Proj>,
     region: BaseRegion,
     u_0: u32,
     u_0_end: u32,
@@ -889,13 +905,13 @@ pub struct FaceIter {
     boundary_along_v: bool,
 }
 
-impl Iterator for FaceIter {
-    type Item = Face;
-    fn next(&mut self) -> Option<Face> {
+impl<Proj: Eq + Clone + TriSphereProjection> Iterator for FaceIter<Proj> {
+    type Item = Face<Proj>;
+    fn next(&mut self) -> Option<Face<Proj>> {
         loop {
             if self.u_0 < self.u_0_end {
                 let res = Face {
-                    sphere: self.sphere,
+                    sphere: self.sphere.clone(),
                     region: self.region,
                     u_0: self.u_0,
                     v_0: self.v_0,
@@ -931,7 +947,7 @@ impl Iterator for FaceIter {
                 }
             }
             if let Some(region) = self.sphere.base().next_region(self.region) {
-                *self = self.sphere.faces_from(region);
+                *self = self.sphere.clone().faces_from(region);
                 continue;
             } else {
                 return None;
@@ -940,21 +956,22 @@ impl Iterator for FaceIter {
     }
 }
 
-impl TriSphere {
+impl<Proj:> TriSphere<Proj> {
     /// Iterates over the vertices of this [`TriSphere`], starting with the given region.
-    fn vertices_from(&self, region: BaseRegion) -> VertexIter {
+    fn vertices_from(self, region: BaseRegion) -> VertexIter<Proj> {
         if region.ty().is_edge() {
+            let u_end = self.b();
             VertexIter {
-                sphere: *self,
+                sphere: self,
                 region,
                 u: 1,
-                u_end: self.b(),
+                u_end,
                 v: 0,
             }
         } else if self.c() < self.b() {
             let n = self.b() - self.c();
             VertexIter {
-                sphere: *self,
+                sphere: self,
                 region,
                 u: 1,
                 u_end: n - 1,
@@ -964,7 +981,7 @@ impl TriSphere {
             // This is a special case. When `b == c` there is exactly one interior vertex,
             // at (0, 0).
             VertexIter {
-                sphere: *self,
+                sphere: self,
                 region,
                 u: 0,
                 u_end: 1,
@@ -976,21 +993,21 @@ impl TriSphere {
 
 /// An iterator over the vertices of an [`TriSphere`].
 #[derive(Clone, Debug)]
-pub struct VertexIter {
-    sphere: TriSphere,
+pub struct VertexIter<Proj> {
+    sphere: TriSphere<Proj>,
     region: BaseRegion,
     u: u32,
     u_end: u32,
     v: u32,
 }
 
-impl Iterator for VertexIter {
-    type Item = Vertex;
-    fn next(&mut self) -> Option<Vertex> {
+impl<Proj: Eq + Clone + TriSphereProjection> Iterator for VertexIter<Proj> {
+    type Item = Vertex<Proj>;
+    fn next(&mut self) -> Option<Vertex<Proj>> {
         loop {
             if self.u < self.u_end {
                 let res = Vertex {
-                    sphere: self.sphere,
+                    sphere: self.sphere.clone(),
                     region: self.region,
                     u: self.u,
                     v: self.v,
@@ -1007,7 +1024,7 @@ impl Iterator for VertexIter {
                     && self.region.owner().owns_vertex_1()
                 {
                     let res = Vertex {
-                        sphere: self.sphere,
+                        sphere: self.sphere.clone(),
                         region: self.region,
                         u: self.u,
                         v: self.v,
@@ -1025,7 +1042,7 @@ impl Iterator for VertexIter {
                 }
             }
             if let Some(region) = self.sphere.base().next_region(self.region) {
-                *self = self.sphere.vertices_from(region);
+                *self = self.sphere.clone().vertices_from(region);
                 continue;
             } else {
                 return None;
@@ -1123,259 +1140,34 @@ impl BaseTriSphere {
     }
 }
 
-// TODO: For best performance, `SphereEvaluator` should be cached when performing operations
-// on the same sphere multiple times. This will require the user's help, so we should figure out a
-// way to expose this to them.
-
-/// Encapsulates the information needed to convert between local coordinates and positions
-/// on a [`TriSphere`].
-struct SphereEvaluator {
-    /// Suppose the vertices of a base face are `v₀`, `v₁`, and `v₂`. This provides a set of
-    /// coefficients `c₀`, `c₁`, and `c₂` such that `p₀ = c₀ v₀ + c₁ v₁ + c₂ v₂` is the
-    /// position of the origin of the interior region corresponding to the face. Due to
-    /// symmetry, the other points of the interior region can be computed by rotating these
-    /// coefficients:
-    ///  * `p₀ = c₀ v₀ + c₁ v₁ + c₂ v₂`
-    ///  * `p₁ = c₀ v₁ + c₁ v₂ + c₂ v₀`
-    ///  * `p₂ = c₀ v₂ + c₁ v₀ + c₂ v₁`
-    p_coeffs: [Scalar; 3],
-
-    /// The angle, in radians, subtended by a step of length `1` in the local coordinate space of
-    /// a region.
-    step_angle: Scalar,
-
-    /// The angle, in radians, subtended by an edge corresponding to the `b` parameter of the
-    /// [`TriSphere`].
-    full_angle_b: Scalar,
-
-    /// The angle, in radians, subtended by an edge corresponding to the `c` parameter of the
-    /// [`TriSphere`].
-    full_angle_c: Scalar,
-}
-
-impl TriSphere {
-    /// Constructs a [`SphereEvaluator`] for this [`TriSphere`].
-    fn eval(&self) -> SphereEvaluator {
-        let b = self.b() as f64;
-        let c = self.c() as f64;
-        if c == 0.0 {
-            let full_angle_b = self.base().edge_angle();
-            return SphereEvaluator {
-                p_coeffs: [1.0, 0.0, 0.0],
-                step_angle: full_angle_b / b,
-                full_angle_b,
-                full_angle_c: 0.0,
-            };
-        }
-
-        // Compute initial estimate of the first interior point `p₀ = c₀ v₀ + c₁ v₁ + c₂ v₂`
-        let w_total = b * b + b * c + c * c;
-        let w_0 = b * b / w_total;
-        let w_1 = c * c / w_total;
-        let w_2 = b * c / w_total;
-        let angle = self.base().edge_angle();
-        let cos_angle = self.base().edge_cos_angle();
-        let c_0 = (w_0 * angle).sin();
-        let c_1 = (w_1 * angle).sin();
-        let c_2 = (w_2 * angle).sin();
-        let mut p_coeffs = normalize_coeffs(cos_angle, [c_0, c_1, c_2]);
-
-        // For continuity between regions, it is very important that `p₂`, `p₀`,
-        // and `v₀` all lie on the same plane, and that `angle(p₀, v₀) / angle(p₂, v₀) = c / b`.
-        // To ensure this, we will refine our initial estimate above.
-        let mut cos_full_angle_b = p_coeffs[1] + (p_coeffs[0] + p_coeffs[2]) * cos_angle;
-        let mut sin_full_angle_b = (1.0 - cos_full_angle_b * cos_full_angle_b).sqrt();
-        let mut full_angle_b = cos_full_angle_b.acos();
-
-        // TODO: Find a better algorithm that converges faster, or a closed form solution.
-        for _ in 0..30 {
-            let t = c / b;
-            p_coeffs = vec3::add(
-                [
-                    ((1.0 - t) * full_angle_b).sin() / sin_full_angle_b,
-                    0.0,
-                    0.0,
-                ],
-                vec3::mul(
-                    [p_coeffs[1], p_coeffs[2], p_coeffs[0]],
-                    (t * full_angle_b).sin() / sin_full_angle_b,
-                ),
-            );
-            cos_full_angle_b = p_coeffs[1] + (p_coeffs[0] + p_coeffs[2]) * cos_angle;
-            sin_full_angle_b = (1.0 - cos_full_angle_b * cos_full_angle_b).sqrt();
-            full_angle_b = cos_full_angle_b.acos();
-        }
-
-        // Compute angles of region edges
-        let full_angle_c = full_angle_b * c / b;
-        let step_angle = full_angle_b / b;
-        SphereEvaluator {
-            p_coeffs,
-            step_angle,
-            full_angle_b,
-            full_angle_c,
+impl<Proj: Eq + Clone + TriSphereProjection> TriSphere<Proj> {
+    /// Gets the [`RegionProjection`] for the given region.
+    fn region_proj(
+        &self,
+        region: BaseRegion,
+    ) -> RegionProjection<impl proj::TriangleProjection, impl proj::ParallelogramProjection> {
+        if region.ty().is_edge() {
+            RegionProjection::Edge(self.proj().edge(self.b(), self.c(), region.as_edge()))
+        } else {
+            RegionProjection::Interior(self.proj().interior(self.b(), self.c(), region.owner()))
         }
     }
 }
 
-/// Given a set of coefficients which are to be applied to a set of vertices, normalizes them
-/// such that the resulting point is on the unit sphere.
-///
-/// `cos_angle` is the cosine of the angle (or, equivalently, the dot product) between any
-/// two of the vertices.
-fn normalize_coeffs(cos_angle: Scalar, coeffs: [Scalar; 3]) -> [Scalar; 3] {
-    let norm_sqr = vec3::dot(coeffs, coeffs)
-        + 2.0 * cos_angle * (coeffs[0] * coeffs[1] + coeffs[1] * coeffs[2] + coeffs[2] * coeffs[0]);
-    let norm = norm_sqr.sqrt();
-    vec3::mul(coeffs, 1.0 / norm)
+/// Maps local coordinates on a [`BaseRegion`] to world coordinates on the unit sphere.
+enum RegionProjection<Interior, Edge> {
+    Interior(Interior),
+    Edge(Edge),
 }
 
-impl SphereEvaluator {
-    /// Constructs an [`RegionEvaluator`] for a particular region of the sphere.
-    pub fn region(&self, region: BaseRegion) -> RegionEvaluator {
-        match region.ty() {
-            BaseRegionType::Edge0 => self.edge(region.owner().side(0)).into(),
-            BaseRegionType::Interior => self.interior(region.owner()).into(),
-            BaseRegionType::Edge2 => self.edge(region.owner().side(2).complement()).into(),
-        }
-    }
-
-    /// Constructs an [`InteriorEvaluator`] for a particular interior region of the sphere.
-    pub fn interior(&self, face: BaseFace) -> InteriorEvaluator {
-        let v_0 = face.vertex(0).pos();
-        let v_1 = face.vertex(1).pos();
-        let v_2 = face.vertex(2).pos();
-        InteriorEvaluator {
-            p: [
-                mat3::apply([v_0, v_1, v_2], self.p_coeffs),
-                mat3::apply([v_1, v_2, v_0], self.p_coeffs),
-                mat3::apply([v_2, v_0, v_1], self.p_coeffs),
-            ],
-            step_angle: self.step_angle,
-            full_angle: safe_angle(self.full_angle_b - self.full_angle_c),
-        }
-    }
-
-    /// Constructs an [`EdgeEvaluator`] for a particular edge region of the sphere.
-    pub fn edge(&self, edge: BaseHalfEdge) -> EdgeEvaluator {
-        let comp = edge.complement();
-        let v_0 = edge.start().pos();
-        let v_1 = comp.start().pos();
-        let v_left = edge.prev().start().pos();
-        let v_right = comp.prev().start().pos();
-        EdgeEvaluator {
-            p_0_0: v_0,
-            p_1_1: v_1,
-            p_0_1: mat3::apply([v_0, v_1, v_left], self.p_coeffs),
-            p_1_0: mat3::apply([v_1, v_0, v_right], self.p_coeffs),
-            step_angle: self.step_angle,
-            full_angle_u: self.full_angle_b,
-            full_angle_v: safe_angle(self.full_angle_c),
-        }
-    }
-}
-
-/// Encapsulates the information needed to convert between local coordinates on a [`BaseRegion`]
-/// and positions on a [`TriSphere`].
-enum RegionEvaluator {
-    Interior(InteriorEvaluator),
-    Edge(EdgeEvaluator),
-}
-
-impl RegionEvaluator {
+impl<Interior: proj::TriangleProjection, Edge: proj::ParallelogramProjection>
+    RegionProjection<Interior, Edge>
+{
     /// Projects a point in the local coordinate space of this region to a point on the sphere.
-    pub fn project(&self, u: Scalar, v: Scalar) -> Vector3 {
+    pub fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3] {
         match self {
-            RegionEvaluator::Interior(eval) => eval.project(u, v),
-            RegionEvaluator::Edge(eval) => eval.project(u, v),
+            RegionProjection::Interior(proj) => proj.to_sphere(coords),
+            RegionProjection::Edge(proj) => proj.to_sphere(coords),
         }
     }
-}
-
-impl From<InteriorEvaluator> for RegionEvaluator {
-    fn from(eval: InteriorEvaluator) -> Self {
-        RegionEvaluator::Interior(eval)
-    }
-}
-
-impl From<EdgeEvaluator> for RegionEvaluator {
-    fn from(eval: EdgeEvaluator) -> Self {
-        RegionEvaluator::Edge(eval)
-    }
-}
-
-/// Encapsulates the information needed to convert between local coordinates on an interior
-/// [`BaseRegion`] and positions on a [`TriSphere`].
-struct InteriorEvaluator {
-    /// The positions of the endpoints of the region on the sphere.
-    p: [Vector3; 3],
-
-    /// The angle, in radians, subtended by a step of length `1` in the local coordinate space of
-    /// this region.
-    step_angle: Scalar,
-
-    /// The angle, in radians, between any two endpoints of the region.
-    full_angle: Scalar,
-}
-
-impl InteriorEvaluator {
-    /// Projects a point in the local coordinate space of this region to a point on the sphere.
-    pub fn project(&self, u: Scalar, v: Scalar) -> Vector3 {
-        let c_1 = (u * self.step_angle).sin();
-        let c_2 = (v * self.step_angle).sin();
-        let c_0 = (self.full_angle - u * self.step_angle - v * self.step_angle).sin();
-        vec3::normalize(mat3::apply(self.p, [c_0, c_1, c_2]))
-    }
-}
-
-/// Encapsulates the information needed to convert between local coordinates on an edge
-/// [`BaseRegion`] and positions on a [`TriSphere`].
-struct EdgeEvaluator {
-    /// The position of the origin of the region on the sphere.
-    p_0_0: Vector3,
-
-    /// The position of the far (U = 1, V = 1) corner of the region on the sphere.
-    p_1_1: Vector3,
-
-    /// The position of the left (U = 0, V = 1) corner of the region on the sphere.
-    p_0_1: Vector3,
-
-    /// The position of the right (U = 1, V = 0) corner of the region on the sphere.
-    p_1_0: Vector3,
-
-    /// The angle, in radians, subtended by a step of length `1` in the local coordinate space of
-    /// this region.
-    step_angle: Scalar,
-
-    /// The angle, in radians, subtended by the U edge of this region.
-    full_angle_u: Scalar,
-
-    /// The angle, in radians, subtended by the V edge of this region.
-    full_angle_v: Scalar,
-}
-
-impl EdgeEvaluator {
-    /// Projects a point in the local coordinate space of this region to a point on the sphere.
-    pub fn project(&self, u: Scalar, v: Scalar) -> Vector3 {
-        let c_u_0 = (self.full_angle_u - u * self.step_angle).sin();
-        let c_u_1 = (u * self.step_angle).sin();
-        let c_v_0 = (self.full_angle_v - v * self.step_angle).sin();
-        let c_v_1 = (v * self.step_angle).sin();
-        vec3::normalize(vec3::add(
-            vec3::add(
-                vec3::mul(self.p_0_0, c_u_0 * c_v_0),
-                vec3::mul(self.p_1_0, c_u_1 * c_v_0),
-            ),
-            vec3::add(
-                vec3::mul(self.p_0_1, c_u_0 * c_v_1),
-                vec3::mul(self.p_1_1, c_u_1 * c_v_1),
-            ),
-        ))
-    }
-}
-
-/// Checks if `angle` is zero. If so, replaces it with an arbitrary positive value. Otherwise
-/// returns it.
-fn safe_angle(angle: Scalar) -> Scalar {
-    if angle == 0.0 { 1.0 } else { angle }
 }

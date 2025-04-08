@@ -1,5 +1,5 @@
 use std::num::NonZero;
-use subsphere::{BaseTriSphere, Face, HexSphere, Sphere, TriSphere, Vertex};
+use subsphere::{BaseTriSphere, Face, Gnomonic, HexSphere, Sphere, TriSphere, Vertex};
 
 #[test]
 fn test_octosphere_base() {
@@ -12,30 +12,30 @@ fn test_octosphere_base() {
 
 #[test]
 fn test_octosphere_4_0() {
-    let sphere = TriSphere::new(BaseTriSphere::Octo, NonZero::new(4).unwrap(), 0);
+    let sphere = TriSphere::new(BaseTriSphere::Octo, Gnomonic, NonZero::new(4).unwrap(), 0);
     assert_eq!(
         sphere,
         subsphere::octosphere().subdivide_edge(NonZero::new(4).unwrap())
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.5543100839896127");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"2.947642915681117");
 }
 
 #[test]
 fn test_octosphere_3_1() {
-    let sphere = TriSphere::new(BaseTriSphere::Octo, NonZero::new(3).unwrap(), 1);
+    let sphere = TriSphere::new(BaseTriSphere::Octo, Gnomonic, NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.392702192665517");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"3.25127639463322");
 }
 
 #[test]
 fn test_octosphere_2_2() {
-    let sphere = TriSphere::new(BaseTriSphere::Octo, NonZero::new(2).unwrap(), 2);
+    let sphere = TriSphere::new(BaseTriSphere::Octo, Gnomonic, NonZero::new(2).unwrap(), 2);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.2450941184111652");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"2.823365049423091");
 }
 
 #[test]
@@ -48,36 +48,37 @@ fn test_icosphere_base() {
 
 #[test]
 fn test_icosphere_4_0() {
-    let sphere = TriSphere::new(BaseTriSphere::Icosa, NonZero::new(4).unwrap(), 0);
+    let sphere = TriSphere::new(BaseTriSphere::Icosa, Gnomonic, NonZero::new(4).unwrap(), 0);
     assert_eq!(
         sphere,
         subsphere::icosphere().subdivide_edge(NonZero::new(4).unwrap())
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.1643667123353725");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.5166490188589952");
 }
 
 #[test]
 fn test_icosphere_3_1() {
-    let sphere = TriSphere::new(BaseTriSphere::Icosa, NonZero::new(3).unwrap(), 1);
+    let sphere = TriSphere::new(BaseTriSphere::Icosa, Gnomonic, NonZero::new(3).unwrap(), 1);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.16284750155026");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.5496588595455347");
 }
 
 #[test]
 fn test_icosphere_2_2() {
-    let sphere = TriSphere::new(BaseTriSphere::Icosa, NonZero::new(2).unwrap(), 2);
+    let sphere = TriSphere::new(BaseTriSphere::Icosa, Gnomonic, NonZero::new(2).unwrap(), 2);
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.073344298185472");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.4636489594797455");
 }
 
 #[test]
-fn test_hexasphere_6_0() {
+fn test_hexsphere_6_0() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
+        Gnomonic,
         NonZero::new(6).unwrap(),
         0,
     ))
@@ -90,13 +91,14 @@ fn test_hexasphere_6_0() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.095471210076965");
+    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.2122760312124317");
 }
 
 #[test]
-fn test_hexasphere_4_1() {
+fn test_hexsphere_4_1() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
+        Gnomonic,
         NonZero::new(4).unwrap(),
         1,
     ))
@@ -107,9 +109,10 @@ fn test_hexasphere_4_1() {
 }
 
 #[test]
-fn test_hexasphere_2_2() {
+fn test_hexsphere_2_2() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
+        Gnomonic,
         NonZero::new(2).unwrap(),
         2,
     ))
