@@ -271,6 +271,11 @@ impl<Proj: Clone> Vertex<Proj> {
             kis: self.kis.sphere.clone(),
         }
     }
+
+    /// The corresponding vertex on the [kised](HexSphere::kis) [`TriSphere`].
+    pub fn kis(self) -> tri::Vertex<Proj> {
+        self.kis
+    } 
 }
 
 impl<Proj: Eq + Clone + TriSphereProjection> crate::Vertex for Vertex<Proj> {
@@ -309,6 +314,13 @@ impl<Proj: Eq + Clone + TriSphereProjection> crate::Vertex for Vertex<Proj> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HalfEdge<Proj> {
     kis: tri::HalfEdge<Proj>,
+}
+
+impl<Proj> HalfEdge<Proj> {
+    /// The corresponding half-edge on the [kised](HexSphere::kis) [`TriSphere`].
+    pub fn kis(self) -> tri::HalfEdge<Proj> {
+        self.kis
+    }
 }
 
 impl<Proj: Eq + Clone + TriSphereProjection> crate::HalfEdge for HalfEdge<Proj> {
