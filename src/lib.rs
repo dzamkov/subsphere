@@ -8,7 +8,6 @@ pub mod basetri;
 pub mod tri;
 pub mod hex;
 
-pub use proj::Gnomonic;
 pub use basetri::BaseTriSphere;
 pub use tri::TriSphere;
 pub use hex::HexSphere;
@@ -19,16 +18,16 @@ use std::num::NonZero;
 /// 
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
-pub fn icosphere() -> TriSphere<Gnomonic> {
-    TriSphere::new(BaseTriSphere::Icosa, Gnomonic, NonZero::new(1).unwrap(), 0)
+pub fn icosphere() -> TriSphere<proj::Fuller> {
+    TriSphere::new(BaseTriSphere::Icosa, proj::Fuller, NonZero::new(1).unwrap(), 0)
 }
 
 /// Constructs a tessellation of the unit sphere by projecting an octohedron onto it.
 /// 
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
-pub fn octosphere() -> TriSphere<Gnomonic> {
-    TriSphere::new(BaseTriSphere::Octo, Gnomonic, NonZero::new(1).unwrap(), 0)
+pub fn octosphere() -> TriSphere<proj::Fuller> {
+    TriSphere::new(BaseTriSphere::Octo, proj::Fuller, NonZero::new(1).unwrap(), 0)
 }
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).

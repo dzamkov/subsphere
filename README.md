@@ -15,13 +15,10 @@ tessellations, and the elements within them, are represented implicitly. They ar
 zero-allocation `Copy` types that can be used to generate geometry on the fly. This lets you work
 with massive tessellations using very little memory.
 
-* **Spherical Geometry:** We aren't just working with flat meshes and projecting the results
-onto a sphere. This crate uses sphere-aware math throughout, giving us less distortion and
-more consistent cell shapes than naive implementations.
+* **Versatility:** This crate allows you to explore a huge variety of tessellations, all sharing a
+common API. There's a bunch of adjustable parameters and you're free to mix-and-match topologies
+and projections to build the tessellation that works best for your needs.
 
-* **Versatility:** This crate provides a variety of tessellations, including triangular
-tessellations based on any [Geodesic Polyhedron](https://en.wikipedia.org/wiki/Geodesic_polyhedron)
-and hexagonal tessellations based on any
-[Goldberg Polyhedron](https://en.wikipedia.org/wiki/Goldberg_polyhedron), all sharing a common
-API. This lets you quickly experiment with them and find the one that works best for your
-application.
+* **Spherical Geometry:** In the world of `subsphere`, there is only one geometric space: the
+sphere. All objects follow the contours of the sphere, and all calculations correctly account for
+this.

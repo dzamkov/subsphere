@@ -195,6 +195,11 @@ impl crate::Vertex for Vertex {
 pub struct HalfEdge(u8);
 
 impl HalfEdge {
+    /// Gets the [`BaseTriSphere`] this face belongs to.
+    pub const fn sphere(self) -> BaseTriSphere {
+        self.inside().sphere()
+    }
+
     /// The index of this half-edge within the [`sides`](crate::Face::sides) list of its
     /// [`inside`](HalfEdge::inside).
     pub const fn side_index(self) -> usize {
