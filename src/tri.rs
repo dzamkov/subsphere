@@ -182,6 +182,40 @@ pub struct Face<Proj> {
     boundary_along_v: bool,
 }
 
+impl<Proj: Eq + Clone + TriSphereProjection> Face<Proj> {
+    /// The approximate position of the center of this face.
+    /// 
+    /// There is no strict definition or guarantees for this function, other than that the
+    /// center of a face will be somewhere inside it. This is typically the fastest way to get a
+    /// representative position on the face.
+    pub fn center(&self) -> [f64; 3] {
+        self.sphere
+            .region_proj(self.region)
+            .to_sphere(if self.boundary_along_v {
+                [self.u_0 as f64 - 1.0 / 3.0, self.v_0 as f64 + 2.0 / 3.0]
+            } else {
+                [self.u_0 as f64 + 1.0 / 3.0, self.v_0 as f64 + 1.0 / 3.0]
+            })
+    }
+}
+
+#[test]
+fn test_center() {
+    use crate::math::sphere_tri_area;
+    let sphere = TriSphere::new(
+        BaseTriSphere::Icosa,
+        proj::Fuller,
+        NonZero::new(4).unwrap(),
+        1,
+    );
+    for face in sphere.faces() {
+        let center = face.center();
+        assert!(sphere_tri_area([face.vertex(0).pos(), face.vertex(1).pos(), center]) > 0.0);
+        assert!(sphere_tri_area([face.vertex(1).pos(), face.vertex(2).pos(), center]) > 0.0);
+        assert!(sphere_tri_area([face.vertex(2).pos(), face.vertex(0).pos(), center]) > 0.0);
+    }
+}
+
 impl<Proj: Eq + Clone + TriSphereProjection> crate::Face for Face<Proj> {
     type Vertex = Vertex<Proj>;
     type HalfEdge = HalfEdge<Proj>;
