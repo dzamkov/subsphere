@@ -805,11 +805,25 @@ impl<Proj: Eq + Clone + TriSphereProjection> crate::HalfEdge for HalfEdge<Proj> 
     type Face = Face<Proj>;
 
     fn side_index(&self) -> usize {
-        todo!()
+        self.dir as usize / 2
     }
 
     fn inside(&self) -> Face<Proj> {
-        todo!()
+        let (d_u, d_v) = match self.dir {
+            HalfEdgeDir::Up => (0, 0),
+            HalfEdgeDir::Vp => (0, 0),
+            HalfEdgeDir::UnVp => (-1, 0),
+            HalfEdgeDir::Un => (0, -1),
+            HalfEdgeDir::Vn => (0, -1),
+            HalfEdgeDir::UpVn => (1, -1),
+        };
+        Face {
+            sphere: self.sphere.clone(),
+            region: self.region,
+            u_0: self.start_u.wrapping_add_signed(d_u),
+            v_0: self.start_v.wrapping_add_signed(d_v),
+            boundary_along_v: (self.dir as usize) % 2 == 1
+        }
     }
 
     fn start(&self) -> Vertex<Proj> {

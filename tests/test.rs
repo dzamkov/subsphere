@@ -1,5 +1,5 @@
 use std::num::NonZero;
-use subsphere::{BaseTriSphere, Face, HexSphere, Sphere, TriSphere, Vertex, proj};
+use subsphere::{proj, BaseTriSphere, Face, HalfEdge, HexSphere, Sphere, TriSphere, Vertex};
 
 #[test]
 fn test_octosphere_base() {
@@ -159,6 +159,15 @@ fn validate(sphere: impl Sphere) {
     for f in sphere.faces() {
         assert_eq!(f.index(), index, "face index mismatch");
         index += 1;
+        
+        // Validate sides
+        let mut side_index = 0;
+        for s in f.sides() {
+            assert!(s.inside() == f);
+            assert_eq!(s.side_index(), side_index, "side index mismatch");
+            side_index += 1;
+        }
+        assert_eq!(side_index, f.num_sides(), "side count mismatch");
     }
     assert_eq!(index, sphere.num_faces(), "face count mismatch");
 
