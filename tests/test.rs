@@ -24,7 +24,7 @@ fn test_octosphere_4_0() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.518841529638549");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.5184953070560394");
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn test_octosphere_3_1() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.3927809614454514");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.8924780020022631");
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn test_octosphere_2_2() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.2450941184111641");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.6794205913771127");
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn test_icosphere_4_0() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.1497182938200778");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.149592490499728");
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn test_icosphere_3_1() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.1628802253352777");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.2142304244815916");
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_icosphere_2_2() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.0733442981854715");
+    insta::assert_snapshot!(area_discrepancy(3, sphere), @"1.17721464511508");
 }
 
 #[test]

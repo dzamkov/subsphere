@@ -6,7 +6,9 @@ use crate::basetri::BaseTriSphere;
 use crate::basetri::Face as BaseFace;
 use crate::basetri::HalfEdge as BaseHalfEdge;
 use crate::basetri::Vertex as BaseVertex;
-use crate::proj::{self, TriSphereProjection};
+use crate::math::vec;
+use crate::proj::TriangleProjection;
+use crate::proj::{self, BaseTriSphereProjection};
 use std::num::NonZero;
 
 /// A tessellation of the unit sphere into triangular [`Face`]s constructed by subdividing a
@@ -48,7 +50,7 @@ impl<Proj> TriSphere<Proj> {
         unsafe { std::mem::transmute((self.c_base & 0b11) as u8) }
     }
 
-    /// The [`TriSphereProjection`] for this sphere.
+    /// The [`BaseTriSphereProjection`] for this sphere.
     pub const fn proj(&self) -> &Proj {
         &self.proj
     }
@@ -103,7 +105,7 @@ impl<Proj> TriSphere<Proj> {
     }
 }
 
-impl<Proj: Clone + TriSphereProjection> TriSphere<Proj> {
+impl<Proj: Clone + BaseTriSphereProjection> TriSphere<Proj> {
     /// Subdivides each edge of this [`TriSphere`] into the given number of segments.
     pub fn subdivide_edge(&self, divs: NonZero<u32>) -> Self {
         Self::new(
@@ -115,13 +117,13 @@ impl<Proj: Clone + TriSphereProjection> TriSphere<Proj> {
     }
 }
 
-impl<Proj: TriSphereProjection + Default> From<BaseTriSphere> for TriSphere<Proj> {
+impl<Proj: BaseTriSphereProjection + Default> From<BaseTriSphere> for TriSphere<Proj> {
     fn from(base: BaseTriSphere) -> Self {
         Self::new(base, Proj::default(), NonZero::new(1).unwrap(), 0)
     }
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> crate::Sphere for TriSphere<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Sphere for TriSphere<Proj> {
     type Face = Face<Proj>;
     type Vertex = Vertex<Proj>;
     type HalfEdge = HalfEdge<Proj>;
@@ -182,9 +184,9 @@ pub struct Face<Proj> {
     boundary_along_v: bool,
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> Face<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> Face<Proj> {
     /// The approximate position of the center of this face.
-    /// 
+    ///
     /// There is no strict definition or guarantees for this function, other than that the
     /// center of a face will be somewhere inside it. This is typically the fastest way to get a
     /// representative position on the face.
@@ -216,7 +218,7 @@ fn test_center() {
     }
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> crate::Face for Face<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Face for Face<Proj> {
     type Vertex = Vertex<Proj>;
     type HalfEdge = HalfEdge<Proj>;
 
@@ -305,7 +307,7 @@ pub struct Vertex<Proj> {
     pub(crate) v: u32,
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> Vertex<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> Vertex<Proj> {
     /// Constructs a [`Vertex`] with the given properties.
     ///
     /// This will normalize the vertex `region` to be its proper owner.
@@ -492,7 +494,7 @@ impl<Proj: Eq + Clone + TriSphereProjection> Vertex<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> crate::Vertex for Vertex<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Vertex for Vertex<Proj> {
     type Face = Face<Proj>;
     type HalfEdge = HalfEdge<Proj>;
 
@@ -670,12 +672,7 @@ impl<Proj> HalfEdge<Proj> {
                 })
             } else {
                 let start_u = sphere.b() - start_u;
-                Self::on_edge_u_boundary(
-                    sphere,
-                    bottom.complement(),
-                    start_u,
-                    dir.rotate_ccw(3),
-                )
+                Self::on_edge_u_boundary(sphere, bottom.complement(), start_u, dir.rotate_ccw(3))
             }
         }
     }
@@ -709,12 +706,7 @@ impl<Proj> HalfEdge<Proj> {
             Self::on_edge_v_boundary(sphere, edge.complement().next(), start_u, dir.rotate_ccw(1))
         } else {
             let start_u = sphere.b() - start_u;
-            Self::on_interior_boundary(
-                sphere,
-                edge.complement(),
-                start_u,
-                dir.rotate_ccw(3),
-            )
+            Self::on_interior_boundary(sphere, edge.complement(), start_u, dir.rotate_ccw(3))
         }
     }
 
@@ -800,7 +792,7 @@ impl<Proj> HalfEdge<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> crate::HalfEdge for HalfEdge<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::HalfEdge for HalfEdge<Proj> {
     type Vertex = Vertex<Proj>;
     type Face = Face<Proj>;
 
@@ -822,7 +814,7 @@ impl<Proj: Eq + Clone + TriSphereProjection> crate::HalfEdge for HalfEdge<Proj> 
             region: self.region,
             u_0: self.start_u.wrapping_add_signed(d_u),
             v_0: self.start_v.wrapping_add_signed(d_v),
-            boundary_along_v: (self.dir as usize) % 2 == 1
+            boundary_along_v: (self.dir as usize) % 2 == 1,
         }
     }
 
@@ -953,7 +945,7 @@ pub struct FaceIter<Proj> {
     boundary_along_v: bool,
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> Iterator for FaceIter<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for FaceIter<Proj> {
     type Item = Face<Proj>;
     fn next(&mut self) -> Option<Face<Proj>> {
         loop {
@@ -1004,7 +996,7 @@ impl<Proj: Eq + Clone + TriSphereProjection> Iterator for FaceIter<Proj> {
     }
 }
 
-impl<Proj:> TriSphere<Proj> {
+impl<Proj> TriSphere<Proj> {
     /// Iterates over the vertices of this [`TriSphere`], starting with the given region.
     fn vertices_from(self, region: BaseRegion) -> VertexIter<Proj> {
         if region.ty().is_edge() {
@@ -1049,7 +1041,7 @@ pub struct VertexIter<Proj> {
     v: u32,
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> Iterator for VertexIter<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for VertexIter<Proj> {
     type Item = Vertex<Proj>;
     fn next(&mut self) -> Option<Vertex<Proj>> {
         loop {
@@ -1188,34 +1180,67 @@ impl BaseTriSphere {
     }
 }
 
-impl<Proj: Eq + Clone + TriSphereProjection> TriSphere<Proj> {
+impl<Proj: Eq + Clone + BaseTriSphereProjection> TriSphere<Proj> {
     /// Gets the [`RegionProjection`] for the given region.
-    fn region_proj(
-        &self,
-        region: BaseRegion,
-    ) -> RegionProjection<impl proj::TriangleProjection, impl proj::ParallelogramProjection> {
-        if region.ty().is_edge() {
-            RegionProjection::Edge(self.proj().edge(self.b(), self.c(), region.as_edge()))
+    fn region_proj(&self, region: BaseRegion) -> RegionProjection<impl proj::TriangleProjection> {
+        let b = self.b() as f64;
+        let c = self.c() as f64;
+        let w_total = b * b + b * c + c * c;
+        let w_1 = c * c / w_total;
+        let w_2 = b * c / w_total;
+        let p_0 = [w_1, w_2];
+        let u = vec::div(vec::sub([1.0, 0.0], p_0), b);
+        let v = if c > 0.0 {
+            vec::div(p_0, c)
         } else {
-            RegionProjection::Interior(self.proj().interior(self.b(), self.c(), region.owner()))
+            [0.0, 1.0 / b]
+        };
+        if region.ty().is_edge() {
+            let left = self
+                .proj()
+                .inside(region.as_edge())
+                .transform([0.0, 0.0], [u, v]);
+            let right = self
+                .proj()
+                .inside(region.as_edge().complement())
+                .transform([1.0, 0.0], [vec::neg(u), vec::neg(v)]);
+            RegionProjection::Edge {
+                left,
+                right,
+                c_over_b: c / b,
+            }
+        } else {
+            RegionProjection::Interior(self.proj().inside(region.owner().side(0)).transform(p_0, [u, v]))
         }
     }
 }
 
 /// Maps local coordinates on a [`BaseRegion`] to world coordinates on the unit sphere.
-enum RegionProjection<Interior, Edge> {
-    Interior(Interior),
-    Edge(Edge),
+enum RegionProjection<Base> {
+    Interior(Base),
+    Edge {
+        left: Base,
+        right: Base,
+        c_over_b: f64,
+    },
 }
 
-impl<Interior: proj::TriangleProjection, Edge: proj::ParallelogramProjection>
-    RegionProjection<Interior, Edge>
-{
+impl<Base: proj::TriangleProjection> RegionProjection<Base> {
     /// Projects a point in the local coordinate space of this region to a point on the sphere.
     pub fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3] {
         match self {
             RegionProjection::Interior(proj) => proj.to_sphere(coords),
-            RegionProjection::Edge(proj) => proj.to_sphere(coords),
+            RegionProjection::Edge {
+                left,
+                right,
+                c_over_b,
+            } => {
+                if coords[0] * c_over_b <= coords[1] {
+                    left.to_sphere(coords)
+                } else {
+                    right.to_sphere(coords)
+                }
+            }
         }
     }
 }
