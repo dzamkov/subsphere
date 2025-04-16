@@ -1,5 +1,5 @@
 use std::num::NonZero;
-use subsphere::{proj, BaseTriSphere, Face, HalfEdge, HexSphere, Sphere, TriSphere, Vertex};
+use subsphere::{BaseTriSphere, Face, HalfEdge, HexSphere, Sphere, TriSphere, Vertex, proj};
 
 #[test]
 fn test_octosphere_base() {
@@ -121,7 +121,7 @@ fn test_hexsphere_6_0() {
     );
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.0509668034000932");
+    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.0509668034000925");
 }
 
 #[test]
@@ -135,7 +135,19 @@ fn test_hexsphere_4_1() {
     .unwrap();
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.073344298185472");
+    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.000000000000003");
+}
+
+#[test]
+fn test_hexsphere_7_1() {
+    let sphere = HexSphere::new(TriSphere::new(
+        BaseTriSphere::Icosa,
+        proj::Fuller,
+        NonZero::new(7).unwrap(),
+        1,
+    ))
+    .unwrap();
+    validate(sphere);
 }
 
 #[test]
@@ -149,23 +161,64 @@ fn test_hexsphere_2_2() {
     .unwrap();
     validate(sphere);
     insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.073344298185472");
+    insta::assert_snapshot!(area_discrepancy(6, sphere), @"1.0000000000000009");
+}
+
+#[test]
+fn test_hexsphere_8_2() {
+    let sphere = HexSphere::new(TriSphere::new(
+        BaseTriSphere::Icosa,
+        proj::Fuller,
+        NonZero::new(8).unwrap(),
+        2,
+    ))
+    .unwrap();
+    validate(sphere);
+}
+
+#[test]
+fn test_hexsphere_3_3() {
+    let sphere = HexSphere::new(TriSphere::new(
+        BaseTriSphere::Icosa,
+        proj::Fuller,
+        NonZero::new(3).unwrap(),
+        3,
+    ))
+    .unwrap();
+    validate(sphere);
 }
 
 /// Validates the internal consistency of the given [`Sphere`].
-fn validate(sphere: impl Sphere) {
+fn validate<S: Sphere>(sphere: S)
+where
+    S::Face: std::fmt::Debug,
+    S::Vertex: std::fmt::Debug,
+    S::HalfEdge: std::fmt::Debug,
+{
     // Validate faces
     let mut index = 0;
     for f in sphere.faces() {
         assert_eq!(f.index(), index, "face index mismatch");
         index += 1;
-        
+
         // Validate sides
         let mut side_index = 0;
+        let mut prev = None;
         for s in f.sides() {
-            assert!(s.inside() == f);
+            assert_eq!(s.inside(), f, "side inside mismatch");
+            assert_eq!(s.start(), f.vertex(side_index), "side start mismatch");
             assert_eq!(s.side_index(), side_index, "side index mismatch");
             side_index += 1;
+            if let Some(prev) = prev {
+                assert_eq!(s.prev(), prev, "side prev mismatch");
+                assert_eq!(prev.next(), s, "side next mismatch");
+            }
+            prev = Some(s);
+        }
+        if let Some(prev) = prev {
+            let s = f.side(0);
+            assert_eq!(s.prev(), prev, "side prev mismatch");
+            assert_eq!(prev.next(), s, "side next mismatch");
         }
         assert_eq!(side_index, f.num_sides(), "side count mismatch");
     }
@@ -176,6 +229,31 @@ fn validate(sphere: impl Sphere) {
     for v in sphere.vertices() {
         assert_eq!(v.index(), index, "vertex index mismatch");
         index += 1;
+
+        // Validate outgoing edges
+        let mut edge_index = 0;
+        let mut prev = None;
+        for e in v.outgoings() {
+            assert_eq!(
+                e.start(),
+                v,
+                "outgoing edge with index {} does not start at vertex",
+                edge_index
+            );
+            assert_eq!(e.outgoing_index(), edge_index, "edge index mismatch");
+            edge_index += 1;
+            if let Some(prev) = prev {
+                assert_eq!(e.complement().next(), prev, "outgoing prev mismatch");
+                assert_eq!(prev.prev().complement(), e, "outgoing next mismatch");
+            }
+            prev = Some(e);
+        }
+        if let Some(prev) = prev {
+            let e = v.outgoing(0);
+            assert_eq!(e.complement().next(), prev, "outgoing prev mismatch");
+            assert_eq!(prev.prev().complement(), e, "outgoing next mismatch");
+        }
+        assert_eq!(edge_index, v.degree(), "vertex degree mismatch");
     }
     assert_eq!(index, sphere.num_vertices(), "vertex count mismatch");
 

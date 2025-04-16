@@ -520,18 +520,25 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Vertex for Vertex<Proj> 
     }
 
     fn degree(&self) -> usize {
-        todo!()
+        if let Some(base) = self.as_base() {
+            base.degree()
+        } else {
+            6
+        }
     }
 
     fn outgoing(&self, index: usize) -> HalfEdge<Proj> {
-        HalfEdge::new(
-            self.sphere.clone(),
-            self.region,
-            self.u,
-            self.v,
-            HalfEdgeDir::from_index(index),
-        )
-        .unwrap_or_else(|base| HalfEdge::base(self.sphere.clone(), base.outgoing(index)))
+        if let Some(base) = self.as_base() {
+            HalfEdge::base(self.sphere.clone(), base.outgoing(index))
+        } else {
+            HalfEdge::new(
+                self.sphere.clone(),
+                self.region,
+                self.u,
+                self.v,
+                HalfEdgeDir::from_index(index),
+            )
+        }
     }
 }
 
@@ -556,7 +563,7 @@ pub struct HalfEdge<Proj> {
 /// Identifies a possible direction of a half-edge with respect to its [`BaseFace`].
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum HalfEdgeDir {
+pub(crate) enum HalfEdgeDir {
     /// The +U direction.
     Up = 0,
 
@@ -580,16 +587,14 @@ impl<Proj> HalfEdge<Proj> {
     /// Attempts to construct a [`HalfEdge`] with the given properties, normalizing
     /// `region` to be its proper owner.
     ///
-    /// This requires `(start_u, start_v)` to be a valid coordinate in the given `region`. This
-    /// will fail if `(start_u, start_v)` is a base vertex, in which case the base vertex will be
-    /// returned.
-    fn new(
+    /// This requires `(start_u, start_v)` to be a valid coordinate in the given `region`.
+    pub(crate) fn new(
         sphere: TriSphere<Proj>,
         region: BaseRegion,
         start_u: u32,
         start_v: u32,
         dir: HalfEdgeDir,
-    ) -> Result<Self, BaseVertex> {
+    ) -> Self {
         if region.ty().is_edge() {
             if start_v == 0 {
                 Self::on_edge_u_boundary(sphere, region.as_edge(), start_u, dir)
@@ -598,37 +603,57 @@ impl<Proj> HalfEdge<Proj> {
             } else if start_v >= sphere.c() {
                 debug_assert_eq!(start_v, sphere.c());
                 let start_u = sphere.b() - start_u;
-                Self::on_edge_u_boundary(sphere, region.as_edge().complement(), start_u, dir)
+                Self::on_edge_u_boundary(
+                    sphere,
+                    region.as_edge().complement(),
+                    start_u,
+                    dir.rotate_ccw(3),
+                )
             } else if start_u >= sphere.b() {
                 debug_assert_eq!(start_u, sphere.b());
                 let start_v = sphere.c() - start_v;
-                Self::on_edge_v_boundary(sphere, region.as_edge().complement(), start_v, dir)
+                Self::on_edge_v_boundary(
+                    sphere,
+                    region.as_edge().complement(),
+                    start_v,
+                    dir.rotate_ccw(3),
+                )
             } else {
-                Ok(Self {
+                Self {
                     sphere,
                     region,
                     start_u,
                     start_v,
                     dir,
-                })
+                }
             }
         } else if start_v == 0 {
             Self::on_interior_boundary(sphere, region.owner().side(0), start_u, dir)
         } else {
             let n = sphere.b() - sphere.c();
             if start_u == 0 {
-                Self::on_interior_boundary(sphere, region.owner().side(2), n - start_v, dir)
+                Self::on_interior_boundary(
+                    sphere,
+                    region.owner().side(2),
+                    n - start_v,
+                    dir.rotate_ccw(2),
+                )
             } else if start_u + start_v >= n {
                 debug_assert_eq!(start_u + start_v, n);
-                Self::on_interior_boundary(sphere, region.owner().side(1), start_v, dir)
+                Self::on_interior_boundary(
+                    sphere,
+                    region.owner().side(1),
+                    start_v,
+                    dir.rotate_ccw(4),
+                )
             } else {
-                Ok(Self {
+                Self {
                     sphere,
                     region,
                     start_u,
                     start_v,
                     dir,
-                })
+                }
             }
         }
     }
@@ -639,52 +664,68 @@ impl<Proj> HalfEdge<Proj> {
         bottom: BaseHalfEdge,
         start_u: u32,
         dir: HalfEdgeDir,
-    ) -> Result<Self, BaseVertex> {
+    ) -> Self {
         if start_u == 0 {
-            if sphere.c() == 0 {
-                Err(bottom.start())
-            } else {
-                todo!()
-            }
-        } else {
-            let n = sphere.b() - sphere.c();
-            let in_region = if start_u >= n {
-                debug_assert_eq!(start_u, n);
-                if sphere.c() == 0 {
-                    return Err(bottom.complement().start());
-                }
-                dir == HalfEdgeDir::UnVp
-            } else {
-                dir < HalfEdgeDir::Un
-            };
-            if in_region {
-                let (start_u, start_v, dir) = match bottom.side_index() {
-                    0 => (start_u, 0, dir),
-                    1 => (sphere.b() - start_u, start_u, dir.rotate_ccw(2)),
-                    _ => (0, sphere.b() - start_u, dir.rotate_ccw(4)),
-                };
-                Ok(Self {
+            let c = sphere.c();
+            if dir > HalfEdgeDir::Up {
+                return Self::on_edge_u_boundary(
                     sphere,
-                    region: BaseRegion::new(bottom.inside(), BaseRegionType::Interior),
-                    start_u,
-                    start_v,
-                    dir,
-                })
-            } else {
-                let start_u = sphere.b() - start_u;
-                Self::on_edge_u_boundary(sphere, bottom.complement(), start_u, dir.rotate_ccw(3))
+                    bottom.prev().complement(),
+                    c + start_u,
+                    dir.rotate_ccw(5),
+                );
             }
+        }
+        let n = sphere.b() - sphere.c();
+        let in_region = if start_u >= n {
+            debug_assert_eq!(start_u, n);
+            dir == HalfEdgeDir::UnVp
+        } else {
+            dir < HalfEdgeDir::Un
+        };
+        if !in_region {
+            let start_u = sphere.b() - start_u;
+            return Self::on_edge_u_boundary(
+                sphere,
+                bottom.complement(),
+                start_u,
+                dir.rotate_ccw(3),
+            );
+        }
+        let (start_u, start_v, dir) = match bottom.side_index() {
+            0 => (start_u, 0, dir),
+            1 => (n - start_u, start_u, dir.rotate_ccw(2)),
+            _ => (0, n - start_u, dir.rotate_ccw(4)),
+        };
+        Self {
+            sphere,
+            region: BaseRegion::new(bottom.inside(), BaseRegionType::Interior),
+            start_u,
+            start_v,
+            dir,
         }
     }
 
     /// Constructs a [`HalfEdge`] on the V (U = 0) boundary of an edge region.
+    ///
+    /// Assumes that `start_v > 0`.
     fn on_edge_v_boundary(
         sphere: TriSphere<Proj>,
         edge: BaseHalfEdge,
         start_v: u32,
         dir: HalfEdgeDir,
-    ) -> Result<Self, BaseVertex> {
-        todo!()
+    ) -> Self {
+        debug_assert!(start_v > 0);
+        if dir >= HalfEdgeDir::Vn {
+            Self::on_edge_exclusive(sphere, edge, 0, start_v, dir)
+        } else if start_v >= sphere.c() {
+            debug_assert_eq!(start_v, sphere.c());
+            Self::on_interior_boundary(sphere, edge, 0, dir)
+        } else if dir == HalfEdgeDir::Up {
+            Self::on_edge_exclusive(sphere, edge, 0, start_v, dir)
+        } else {
+            Self::on_edge_u_boundary(sphere, edge.prev().complement(), start_v, dir.rotate_ccw(5))
+        }
     }
 
     /// Constructs a [`HalfEdge`] on the U (V = 0) boundary of an edge region.
@@ -693,15 +734,27 @@ impl<Proj> HalfEdge<Proj> {
         edge: BaseHalfEdge,
         start_u: u32,
         dir: HalfEdgeDir,
-    ) -> Result<Self, BaseVertex> {
-        if start_u == 0 {
-            Err(edge.start())
-        } else if sphere.c() == 0 {
+    ) -> Self {
+        if sphere.c() == 0 {
             Self::on_interior_boundary(sphere, edge, start_u, dir)
-        } else if start_u == sphere.b() {
-            todo!()
+        } else if start_u == 0 {
+            let mut edge = edge;
+            let mut dir = dir;
+            while dir > HalfEdgeDir::Up {
+                edge = edge.prev().complement();
+                dir = dir.rotate_ccw(5);
+            }
+            Self::on_edge_exclusive(sphere, edge, 0, 0, HalfEdgeDir::Up)
+        } else if start_u == sphere.b() && dir == HalfEdgeDir::Up {
+            let c = sphere.c();
+            Self::on_edge_u_boundary(
+                sphere,
+                edge.complement().prev().complement(),
+                c,
+                HalfEdgeDir::UnVp,
+            )
         } else if dir < HalfEdgeDir::Un {
-            Ok(Self::on_edge_exclusive(sphere, edge, start_u, 0, dir))
+            Self::on_edge_exclusive(sphere, edge, start_u, 0, dir)
         } else if start_u <= sphere.c() {
             Self::on_edge_v_boundary(sphere, edge.complement().next(), start_u, dir.rotate_ccw(1))
         } else {
@@ -787,7 +840,7 @@ impl<Proj> HalfEdge<Proj> {
                 dir,
             }
         } else {
-            todo!()
+            Self::on_edge_exclusive(sphere, source, 0, 0, HalfEdgeDir::Up)
         }
     }
 }
@@ -823,24 +876,36 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::HalfEdge for HalfEdge<Pr
     }
 
     fn complement(&self) -> HalfEdge<Proj> {
-        todo!()
+        let [d_u, d_v] = self.dir.into_vec();
+        HalfEdge::new(
+            self.sphere.clone(),
+            self.region,
+            self.start_u.wrapping_add_signed(d_u),
+            self.start_v.wrapping_add_signed(d_v),
+            self.dir.rotate_ccw(3),
+        )
     }
 
     fn prev(&self) -> HalfEdge<Proj> {
-        todo!()
-    }
-
-    fn next(&self) -> HalfEdge<Proj> {
-        let mut start_u = self.start_u;
-        let mut start_v = self.start_v;
-        self.dir.add_to(&mut start_u, &mut start_v);
-        let dir = self.dir.rotate_ccw(2);
+        let dir = self.dir.rotate_ccw(4);
+        let [d_u, d_v] = dir.into_vec();
         HalfEdge {
             sphere: self.sphere.clone(),
             region: self.region,
-            start_u,
-            start_v,
+            start_u: self.start_u.wrapping_add_signed(-d_u),
+            start_v: self.start_v.wrapping_add_signed(-d_v),
             dir,
+        }
+    }
+
+    fn next(&self) -> HalfEdge<Proj> {
+        let [d_u, d_v] = self.dir.into_vec();
+        HalfEdge {
+            sphere: self.sphere.clone(),
+            region: self.region,
+            start_u: self.start_u.wrapping_add_signed(d_u),
+            start_v: self.start_v.wrapping_add_signed(d_v),
+            dir: self.dir.rotate_ccw(2),
         }
     }
 }
@@ -854,19 +919,11 @@ impl HalfEdgeDir {
         unsafe { std::mem::transmute(index as u8) }
     }
 
-    /// Adds this [`HalfEdgeDir`] to the given U and V coordinates.
-    pub fn add_to(self, u: &mut u32, v: &mut u32) {
-        static TABLE: [(i8, i8); 6] = [
-            (1, 0),  // Up
-            (0, 1),  // Vp
-            (-1, 1), // UnVp
-            (-1, 0), // Un
-            (0, -1), // Vn
-            (1, -1), // UpVn
-        ];
-        let (d_u, d_v) = TABLE[self as usize];
-        *u = u.wrapping_add_signed(d_u as i32);
-        *v = v.wrapping_add_signed(d_v as i32);
+    /// Converts this direction into a vector representation.
+    pub fn into_vec(self) -> [i32; 2] {
+        let u = (0x020100000102u64 >> (self as usize * 8)) as u8 as i32 - 1;
+        let v = (0x000001020201u64 >> (self as usize * 8)) as u8 as i32 - 1;
+        [u, v]
     }
 
     /// Rotates this [`HalfEdgeDir`] counter-clockwise by `amount * 60` degrees.
@@ -1210,7 +1267,11 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> TriSphere<Proj> {
                 c_over_b: c / b,
             }
         } else {
-            RegionProjection::Interior(self.proj().inside(region.owner().side(0)).transform(p_0, [u, v]))
+            RegionProjection::Interior(
+                self.proj()
+                    .inside(region.owner().side(0))
+                    .transform(p_0, [u, v]),
+            )
         }
     }
 }

@@ -70,10 +70,14 @@ impl<Proj> HexSphere<Proj> {
 
     /// The number of faces per interior [`BaseRegion`].
     fn num_faces_per_interior_region(&self) -> usize {
-        // TODO: There's a bug here. The number of faces also depends on the offset of the
-        // interior region (i.e. `c`).
-        let n_3 = (self.kis.b() - self.kis.c()) as isize / 3;
-        (n_3 * n_3 + ((n_3 - 1) * (n_3 - 2) / 2)) as usize
+        let b = self.kis.b() as usize;
+        let c = self.kis.c() as usize;
+        let n = b - c;
+        if n == 0 {
+            (c % 3 == 0) as usize
+        } else {
+            num_faces_on_interior(c, n, n)
+        }
     }
 
     /// The number of vertices per edge [`BaseRegion`], assuming that the origin vertex is not
@@ -116,32 +120,35 @@ fn test_num_faces_on_edge() {
     }
 }
 
-/// Counts the number of points `(u, v)` such that `0 < u + v < n`, `v < d` and `u % 3 == v % 3`.
-/// Assumes that `n` is a multiple of 3.
-fn num_faces_on_interior(n: usize, d: usize) -> usize {
-    (d - 1) * (2 * n - d - 2) / 6 + (d % 3 != 1) as usize
+/// Counts the number of points `(u, v)` such that `0 < u + v < n`, `v < d` and
+/// `u % 3 == (v + k) % 3`. Assumes that `n` is a multiple of 3.
+fn num_faces_on_interior(k: usize, n: usize, d: usize) -> usize {
+    (d - 1) * (2 * n - d - 2) / 6 + ((k % 3 == 0) & (d % 3 != 1)) as usize
 }
 
 #[test]
 fn test_num_faces_on_interior() {
-    for n_3 in 1..10 {
-        let n = n_3 * 3;
-        for d in 1..n {
-            let mut count = 0;
-            for u in 1..n {
-                for v in 1..d {
-                    if u + v < n && u % 3 == v % 3 {
-                        count += 1;
+    for k in 0..2 {
+        for n_3 in 1..10 {
+            let n = n_3 * 3;
+            for d in 1..n {
+                let mut count = 0;
+                for u in 1..n {
+                    for v in 1..d {
+                        if u + v < n && u % 3 == (v + k) % 3 {
+                            count += 1;
+                        }
                     }
                 }
+                assert_eq!(
+                    num_faces_on_interior(k, n, d),
+                    count,
+                    "failed for k = {}, n = {}, d = {}",
+                    k,
+                    n,
+                    d
+                );
             }
-            assert_eq!(
-                num_faces_on_interior(n, d),
-                count,
-                "failed for n = {}, d = {}",
-                n,
-                d
-            );
         }
     }
 }
@@ -198,7 +205,7 @@ pub struct Face<Proj> {
 impl<Proj: Eq + Clone + BaseTriSphereProjection> Face<Proj> {
     /// Constructs a [`Face`] from the given central vertex.
     fn new(center: tri::Vertex<Proj>) -> Self {
-        debug_assert!(center.u % 3 == center.v % 3);
+        debug_assert_eq!(center.u % 3, center.adjusted_v() % 3);
         Self { center }
     }
 
@@ -220,15 +227,16 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Face for Face<Proj> {
     type HalfEdge = HalfEdge<Proj>;
 
     fn index(&self) -> usize {
+        let b = self.center.sphere.b() as usize;
+        let c = self.center.sphere.c() as usize;
         if self.center.region.ty().is_edge() {
             self.sphere().base_face_index(self.center.region)
-                + num_faces_on_edge(self.center.sphere.b() as usize, self.center.v as usize)
-                + (self.center.u as usize + 2) / 3
-        } else if self.center.sphere.c() < self.center.sphere.b() {
-            let n = (self.center.sphere.b() - self.center.sphere.c()) as usize;
+                + num_faces_on_edge(b, self.center.v as usize)
+                + (self.center.u as usize).div_ceil(3)
+        } else if c < b {
             self.sphere().base_face_index(self.center.region)
-                + num_faces_on_interior(n, self.center.v as usize)
-                + (self.center.u as usize + 2) / 3
+                + num_faces_on_interior(c, b - c, self.center.v as usize)
+                + (self.center.u as usize).div_ceil(3)
         } else {
             self.sphere().base_face_index(self.center.region) + 1
         }
@@ -258,11 +266,25 @@ pub struct Vertex<Proj> {
 impl<Proj> Vertex<Proj> {
     /// Constructs a [`Vertex`] from the given [`tri::Vertex`].
     fn new(kis: tri::Vertex<Proj>) -> Self {
-        debug_assert!((kis.u + kis.v * 2) % 3 != 0);
+        debug_assert_ne!(kis.u % 3, kis.adjusted_v() % 3);
         Self { kis }
     }
 }
 
+impl<Proj> tri::Vertex<Proj> {
+    /// The `v` coordinate of this vertex, measured from the base vertex of its region, rather
+    /// than the local origin.
+    ///
+    /// The combination of `u` and `adjusted_v` can be used to tell whether a [`tri::Vertex`]
+    /// corresponds to a face or a vertex on a [`HexSphere`].
+    fn adjusted_v(&self) -> u32 {
+        let mut v = self.v;
+        if !self.region.ty().is_edge() {
+            v += self.sphere.c();
+        }
+        v
+    }
+}
 
 impl<Proj: Clone> Vertex<Proj> {
     /// The [`HexSphere`] that this [`Vertex`] belongs to.
@@ -275,7 +297,7 @@ impl<Proj: Clone> Vertex<Proj> {
     /// The corresponding vertex on the [kised](HexSphere::kis) [`TriSphere`].
     pub fn kis(self) -> tri::Vertex<Proj> {
         self.kis
-    } 
+    }
 }
 
 impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Vertex for Vertex<Proj> {
@@ -283,17 +305,20 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Vertex for Vertex<Proj> 
     type HalfEdge = HalfEdge<Proj>;
 
     fn index(&self) -> usize {
+        let b = self.kis.sphere.b() as usize;
+        let c = self.kis.sphere.c() as usize;
         if self.kis.region.ty().is_edge() {
-            self.sphere().base_vertex_index(self.kis.region)
-                + self.kis.v as usize * (self.kis.sphere.b() as usize - 1)
-                - num_faces_on_edge(self.kis.sphere.b() as usize, self.kis.v as usize)
+            self.sphere().base_vertex_index(self.kis.region) + self.kis.v as usize * (b - 1)
+                - num_faces_on_edge(b, self.kis.v as usize)
                 + (self.kis.u as usize * 2 - 1 - (self.kis.v % 3 == 1) as usize) / 3
-        } else {
-            let n = (self.kis.sphere.b() - self.kis.sphere.c()) as usize;
+        } else if c < b {
+            let n = b - c;
             self.sphere().base_vertex_index(self.kis.region)
                 + (self.kis.v as usize - 1) * (2 * n - self.kis.v as usize - 2) / 2
-                - num_faces_on_interior(n, self.kis.v as usize)
-                + (self.kis.u as usize * 2 - 1 - (self.kis.v % 3 == 1) as usize) / 3
+                - num_faces_on_interior(c, n, self.kis.v as usize)
+                + (self.kis.u as usize * 2 - 1 - ((self.kis.v as usize + c) % 3 == 1) as usize) / 3
+        } else {
+            self.sphere().base_vertex_index(self.kis.region)
         }
     }
 
@@ -306,7 +331,18 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Vertex for Vertex<Proj> 
     }
 
     fn outgoing(&self, index: usize) -> HalfEdge<Proj> {
-        todo!()
+        assert!(index < 3, "index out of bounds");
+        let phase = (self.kis.u + 2 * self.kis.adjusted_v()) % 3;
+        debug_assert_ne!(phase, 0);
+        HalfEdge {
+            kis: tri::HalfEdge::new(
+                self.kis.sphere.clone(),
+                self.kis.region,
+                self.kis.u,
+                self.kis.v,
+                tri::HalfEdgeDir::from_index(2 * index + phase as usize - 1),
+            ),
+        }
     }
 }
 
@@ -328,11 +364,13 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::HalfEdge for HalfEdge<Pr
     type Vertex = Vertex<Proj>;
 
     fn side_index(&self) -> usize {
-        todo!()
+        self.kis.prev().outgoing_index()
     }
 
     fn inside(&self) -> Face<Proj> {
-        todo!()
+        Face {
+            center: self.kis.prev().start(),
+        }
     }
 
     fn start(&self) -> Vertex<Proj> {
@@ -342,15 +380,21 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::HalfEdge for HalfEdge<Pr
     }
 
     fn complement(&self) -> Self {
-        todo!()
+        Self {
+            kis: self.kis.complement(),
+        }
     }
 
     fn prev(&self) -> Self {
-        todo!()
+        Self {
+            kis: self.kis.prev().complement().prev(),
+        }
     }
 
     fn next(&self) -> Self {
-        todo!()
+        Self {
+            kis: self.kis.next().complement().next(),
+        }
     }
 }
 
@@ -385,31 +429,32 @@ impl<Proj> HexSphere<Proj> {
 impl<Proj> HexSphere<Proj> {
     /// Iterates over the faces of this [`HexSphere`], starting with the given region.
     fn faces_from(self, region: BaseRegion) -> FaceIter<Proj> {
+        let b = self.kis.b();
+        let c = self.kis.c();
         if region.ty().is_edge() {
-            let u_end = self.kis.b();
             FaceIter {
                 sphere: self,
                 region,
                 u: 3,
-                u_end,
+                u_end: b,
                 v: 0,
             }
-        } else if self.kis.c() < self.kis.b() {
-            let n = self.kis.b() - self.kis.c();
+        } else if c < b {
+            let n = b - c;
             FaceIter {
                 sphere: self,
                 region,
-                u: 1,
+                u: 1 + c % 3,
                 u_end: n - 1,
                 v: 1,
             }
         } else {
-            // This is a special case. When `b == c` there is exactly one interior vertex,
-            // at (0, 0).
+            // This is a special case. When `b == c` and `c % 3 == 0`, there is exactly one
+            // interior face, at (0, 0).
             FaceIter {
                 sphere: self,
                 region,
-                u: 0,
+                u: c % 3,
                 u_end: 1,
                 v: 0,
             }
@@ -462,7 +507,7 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for FaceIter<Proj> {
                 let n = self.sphere.kis.b() - self.sphere.kis.c();
                 if self.v + 1 < n {
                     self.v += 1;
-                    self.u = 1 + (self.v + 2) % 3;
+                    self.u = 1 + (self.v + self.sphere.kis.c() + 2) % 3;
                     self.u_end = n - self.v;
                     continue;
                 }
@@ -479,25 +524,38 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for FaceIter<Proj> {
 
 impl<Proj: Eq + Clone + BaseTriSphereProjection> HexSphere<Proj> {
     /// Iterates over the vertices of this [`HexSphere`], starting with the given region.
-    fn vertices_from(&self, region: BaseRegion) -> VertexIter<Proj> {
+    fn vertices_from(self, region: BaseRegion) -> VertexIter<Proj> {
+        let b = self.kis.b();
+        let c = self.kis.c();
         if region.ty().is_edge() {
             VertexIter {
-                sphere: self.clone(),
+                sphere: self,
                 region,
                 u: 1,
-                u_end: self.kis.b(),
+                u_end: b,
                 v: 0,
                 skip: false,
             }
-        } else {
-            let n = self.kis.b() - self.kis.c();
+        } else if c < b {
+            let n = b - c;
             VertexIter {
-                sphere: self.clone(),
+                sphere: self,
                 region,
-                u: 2,
+                u: 1 + (c % 3 == 0) as u32,
                 u_end: n.saturating_sub(1),
                 v: 1,
-                skip: false,
+                skip: c % 3 == 1,
+            }
+        } else {
+            // This is a special case. When `b == c` and `c % 3 > 0`, there is exactly one
+            // interior vertex, at (0, 0).
+            VertexIter {
+                sphere: self,
+                region,
+                u: (c % 3 == 0) as u32,
+                u_end: 1,
+                v: 0,
+                skip: c % 3 == 2,
             }
         }
     }
@@ -532,10 +590,10 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for VertexIter<Proj> {
             } else if self.region.ty().is_edge() {
                 if self.v < self.sphere.kis.c() {
                     self.v += 1;
-                    (self.u, self.skip) = match (self.v * 2) % 3 {
+                    (self.u, self.skip) = match self.v % 3 {
                         0 => (1, false),
-                        1 => (1, true),
-                        _ => (2, false),
+                        1 => (2, false),
+                        _ => (1, true),
                     };
                     continue;
                 }
@@ -544,16 +602,16 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for VertexIter<Proj> {
                 if self.v + 1 < n {
                     self.v += 1;
                     self.u_end = n - self.v;
-                    (self.u, self.skip) = match (self.v * 2) % 3 {
+                    (self.u, self.skip) = match (self.v + self.sphere.kis.c()) % 3 {
                         0 => (1, false),
-                        1 => (1, true),
-                        _ => (2, false),
+                        1 => (2, false),
+                        _ => (1, true),
                     };
                     continue;
                 }
             }
             if let Some(region) = self.sphere.kis.base().next_region(self.region) {
-                *self = self.sphere.vertices_from(region);
+                *self = self.sphere.clone().vertices_from(region);
                 continue;
             } else {
                 return None;

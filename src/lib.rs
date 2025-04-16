@@ -3,31 +3,41 @@
 #![deny(missing_docs)]
 mod math;
 
-pub mod proj;
 pub mod basetri;
-pub mod tri;
 pub mod hex;
+pub mod proj;
+pub mod tri;
 
 pub use basetri::BaseTriSphere;
-pub use tri::TriSphere;
 pub use hex::HexSphere;
+pub use tri::TriSphere;
 
 use std::num::NonZero;
 
 /// Constructs a tessellation of the unit sphere by projecting an icosahedron onto it.
-/// 
+///
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
 pub fn icosphere() -> TriSphere<proj::Fuller> {
-    TriSphere::new(BaseTriSphere::Icosa, proj::Fuller, NonZero::new(1).unwrap(), 0)
+    TriSphere::new(
+        BaseTriSphere::Icosa,
+        proj::Fuller,
+        NonZero::new(1).unwrap(),
+        0,
+    )
 }
 
 /// Constructs a tessellation of the unit sphere by projecting an octohedron onto it.
-/// 
+///
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
 pub fn octosphere() -> TriSphere<proj::Fuller> {
-    TriSphere::new(BaseTriSphere::Octo, proj::Fuller, NonZero::new(1).unwrap(), 0)
+    TriSphere::new(
+        BaseTriSphere::Octo,
+        proj::Fuller,
+        NonZero::new(1).unwrap(),
+        0,
+    )
 }
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
@@ -94,6 +104,8 @@ pub trait Face: Clone + Eq {
     fn num_sides(&self) -> usize;
 
     /// Gets a [`Vertex`] of this face given its index within [`Face::vertices`].
+    /// 
+    /// This should be equivalent to `side(index).start()`.
     fn vertex(&self, index: usize) -> Self::Vertex {
         self.side(index).start()
     }
@@ -151,7 +163,7 @@ pub trait Vertex: Clone + Eq {
 
     /// Iterates over the outgoing [`HalfEdge`]s which have this vertex as their
     /// [`start`](HalfEdge::start).
-    /// 
+    ///
     /// Edges will be returned in counter-clockwise order around the vertex.
     fn outgoings(&self) -> impl Iterator<Item = Self::HalfEdge> {
         (0..self.degree()).map(|i| self.outgoing(i))
@@ -171,7 +183,15 @@ pub trait HalfEdge: Clone + Eq {
 
     /// The index of this half-edge within the [`Face::sides`] list of its
     /// [`inside`](HalfEdge::inside).
-    fn side_index(&self) -> usize;
+    fn side_index(&self) -> usize {
+        self.inside().sides().position(|h| h == *self).unwrap()
+    }
+
+    /// The index of this half-edge within the [`Vertex::outgoings`] list of its
+    /// [`start`](HalfEdge::start).
+    fn outgoing_index(&self) -> usize {
+        self.start().outgoings().position(|h| h == *self).unwrap()
+    }
 
     /// Gets the [`Face`] whose interior boundary contains this half-edge.
     fn inside(&self) -> Self::Face;
