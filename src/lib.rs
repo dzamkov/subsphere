@@ -7,6 +7,7 @@ pub mod basetri;
 pub mod hex;
 pub mod proj;
 pub mod tri;
+pub mod util;
 
 pub use basetri::BaseTriSphere;
 pub use hex::HexSphere;
@@ -41,6 +42,9 @@ pub fn octosphere() -> TriSphere<proj::Fuller> {
 }
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
+/// 
+/// There are numerous requirements for a valid [`Sphere`] implementation. Custom implementations
+/// may use [`util::validate`] to check that these requirements are met.
 pub trait Sphere {
     /// The type of [`Face`] on this sphere.
     type Face: Face<Vertex = Self::Vertex, HalfEdge = Self::HalfEdge>;
@@ -104,7 +108,7 @@ pub trait Face: Clone + Eq {
     fn num_sides(&self) -> usize;
 
     /// Gets a [`Vertex`] of this face given its index within [`Face::vertices`].
-    /// 
+    ///
     /// This should be equivalent to `side(index).start()`.
     fn vertex(&self, index: usize) -> Self::Vertex {
         self.side(index).start()
