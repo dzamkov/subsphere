@@ -103,16 +103,6 @@ pub(crate) mod mat {
     }
 }
 
-/// Computes the area (or equivalently, the solid angle) of a spherical triangle.
-pub fn sphere_tri_area(points: [[f64; 3]; 3]) -> f64 {
-    // https://www.johndcook.com/blog/2021/11/29/area-of-spherical-triangle/
-    let d = 1.0
-        + vec::dot(points[0], points[1])
-        + vec::dot(points[1], points[2])
-        + vec::dot(points[2], points[0]);
-    (mat::det(points) / d).atan() * 2.0
-}
-
 /// Determines the real roots of a cubic polynomial of the form `a x³ + b x² + c x + d`.
 pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> impl Iterator<Item = f64> {
     // Handle quadratic case explicitly.

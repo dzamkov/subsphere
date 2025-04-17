@@ -242,6 +242,10 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Face for Face<Proj> {
         }
     }
 
+    fn area(&self) -> f64 {
+        crate::util::poly_area(self.vertices().map(|v| v.pos()))
+    }
+
     fn num_sides(&self) -> usize {
         if let Some(base) = self.center.as_base() {
             base.degree()

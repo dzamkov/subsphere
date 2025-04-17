@@ -203,7 +203,7 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Face<Proj> {
 
 #[test]
 fn test_center() {
-    use crate::math::sphere_tri_area;
+    use crate::util::tri_area;
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Fuller,
@@ -212,9 +212,9 @@ fn test_center() {
     );
     for face in sphere.faces() {
         let center = face.center();
-        assert!(sphere_tri_area([face.vertex(0).pos(), face.vertex(1).pos(), center]) > 0.0);
-        assert!(sphere_tri_area([face.vertex(1).pos(), face.vertex(2).pos(), center]) > 0.0);
-        assert!(sphere_tri_area([face.vertex(2).pos(), face.vertex(0).pos(), center]) > 0.0);
+        assert!(tri_area([face.vertex(0).pos(), face.vertex(1).pos(), center]) > 0.0);
+        assert!(tri_area([face.vertex(1).pos(), face.vertex(2).pos(), center]) > 0.0);
+        assert!(tri_area([face.vertex(2).pos(), face.vertex(0).pos(), center]) > 0.0);
     }
 }
 
@@ -245,7 +245,7 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Face for Face<Proj> {
         let p_0 = eval.to_sphere([u_0 as f64, v_0 as f64]);
         let p_1 = eval.to_sphere([u_1 as f64, v_1 as f64]);
         let p_2 = eval.to_sphere([u_2 as f64, v_2 as f64]);
-        crate::math::sphere_tri_area([p_0, p_1, p_2])
+        crate::util::tri_area([p_0, p_1, p_2])
     }
 
     fn num_sides(&self) -> usize {

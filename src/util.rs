@@ -1,5 +1,40 @@
 //! Contains utility functions related to spheres, tessellations and projections.
 use crate::{Face, HalfEdge, Sphere, Vertex};
+use crate::math::{vec, mat};
+
+/// Computes the signed area of a spherical triangle with the given vertices.
+/// 
+/// This will be positive if the points are in counter-clockwise order, negative if they
+/// are in clockwise order, and zero if they are collinear. If any of the points are not on
+/// the unit sphere, the result will be undefined.
+pub fn tri_area(points: [[f64; 3]; 3]) -> f64 {
+    // https://www.johndcook.com/blog/2021/11/29/area-of-spherical-triangle/
+    let d = 1.0
+        + vec::dot(points[0], points[1])
+        + vec::dot(points[1], points[2])
+        + vec::dot(points[2], points[0]);
+    (mat::det(points) / d).atan() * 2.0
+}
+
+/// Computes the signed area of a spherical polygon with the given vertices.
+/// 
+/// This will be positive if the points are in counter-clockwise order or negative if they
+/// are in clockwise order. If any of the points are not on the unit sphere, the result will be
+/// undefined.
+pub fn poly_area(mut points: impl Iterator<Item = [f64; 3]>) -> f64 {
+    let Some(a) = points.next() else {
+        return 0.0;
+    };
+    let Some(mut b) = points.next() else {
+        return 0.0;
+    };
+    let mut res = 0.0;
+    for c in points {
+        res += tri_area([a, b, c]);
+        b = c;
+    }
+    res
+}
 
 /// Validates the internal consistency of the given [`Sphere`].
 /// 

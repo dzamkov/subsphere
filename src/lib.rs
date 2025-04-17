@@ -91,18 +91,10 @@ pub trait Face: Clone + Eq {
     ///
     /// This is also known as the [solid angle](https://en.wikipedia.org/wiki/Solid_angle)
     /// subtended by the face. The sum of the areas of all faces on a sphere is `4 π`.
-    fn area(&self) -> f64 {
-        let mut verts = self.vertices();
-        let a = verts.next().unwrap().pos();
-        let mut b = verts.next().unwrap().pos();
-        let mut res = 0.0;
-        for c in verts {
-            let c = c.pos();
-            res += math::sphere_tri_area([a, b, c]);
-            b = c;
-        }
-        res
-    }
+    /// 
+    /// For faces whose edges are all geodesics, this is equivalent to the [`util::poly_area`]
+    /// of the vertices of the face.
+    fn area(&self) -> f64;
 
     /// The number of sides (vertices or edges) that this face has.
     fn num_sides(&self) -> usize;

@@ -143,6 +143,15 @@ impl crate::Face for Face {
         (self.0 - self.sphere().first_face_inner()) as usize
     }
 
+    fn area(&self) -> f64 {
+        use crate::Vertex;
+        // TODO: Convert to lookup table
+        let v_0 = self.side(0).start().pos();
+        let v_1 = self.side(1).start().pos();
+        let v_2 = self.side(2).start().pos();
+        crate::util::tri_area([v_0, v_1, v_2])
+    }
+
     fn num_sides(&self) -> usize {
         3
     }
