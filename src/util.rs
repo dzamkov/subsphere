@@ -2,6 +2,24 @@
 use crate::{Face, HalfEdge, Sphere, Vertex};
 use crate::math::{vec, mat};
 
+/// Computes the distance between two points on the unit sphere, or equivalently, the angle between
+/// them in radians.
+pub fn dist(a: [f64; 3], b: [f64; 3]) -> f64 {
+    // TODO: Use `asin` for small angles to improve precision
+    vec::dot(a, b).acos()
+}
+
+/// Computes an interior angle on a spherical triangle.
+/// 
+/// The vertices of the triangle are given. This will find the interior angle corresponding to
+/// vertex `b`.
+pub fn angle(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> f64 {
+    let n_0 = vec::normalize(vec::cross(a, b));
+    let n_1 = vec::normalize(vec::cross(c, b));
+    // TODO: Use `asin` for small angles to improve precision
+    vec::dot(n_0, n_1).acos()
+}
+
 /// Computes the signed area of a spherical triangle with the given vertices.
 /// 
 /// This will be positive if the points are in counter-clockwise order, negative if they
@@ -116,4 +134,16 @@ where
         4.0 * std::f64::consts::PI,
         total_area
     );
+
+    // Validate interior angles
+    for v in sphere.vertices() {
+        let total_angle: f64 = v.outgoings().map(|e| e.angle()).sum();
+        assert!(
+            (total_angle - 2.0 * std::f64::consts::PI).abs() < 1e-12,
+            "total interior angle at vertex {:?} mismatch: expected {:?}, got {:?}",
+            v,
+            2.0 * std::f64::consts::PI,
+            total_angle
+        );
+    }
 }

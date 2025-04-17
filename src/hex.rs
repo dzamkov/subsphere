@@ -371,6 +371,17 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::HalfEdge for HalfEdge<Pr
         self.kis.prev().outgoing_index()
     }
 
+    fn length(&self) -> f64 {
+        self.kis.length()
+    }
+    
+    fn angle(&self) -> f64 {
+        let v_a = self.prev().start().pos();
+        let v_b = self.start().pos();
+        let v_c = self.next().start().pos();
+        crate::util::angle(v_a, v_b, v_c)
+    }
+
     fn inside(&self) -> Face<Proj> {
         Face {
             center: self.kis.prev().start(),

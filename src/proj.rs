@@ -266,7 +266,7 @@ pub mod fuller {
         type Triangle = Triangle;
         fn inside(&self, edge: basetri::HalfEdge) -> Triangle {
             self.triangle(
-                edge.sphere().vertex_angle(),
+                edge.sphere().edge_length(),
                 [
                     edge.start().pos(),
                     edge.next().start().pos(),

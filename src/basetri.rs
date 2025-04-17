@@ -20,15 +20,15 @@ impl BaseTriSphere {
         self.lookup::<5, 4, 3>() as usize
     }
 
-    /// The angle, in radians, between two adjacent vertices of this base shape.
-    pub const fn vertex_angle(self) -> f64 {
+    /// The length of any edge on this base shape, or equivalently, the angle between any
+    /// two adjacent vertices.
+    pub const fn edge_length(self) -> f64 {
         [1.1071487177940904, std::f64::consts::FRAC_PI_2][self as usize]
     }
 
-    /// The cosine of [`vertex_angle`](BaseTriSphere::vertex_angle`).
-    /// 
-    /// Equivalently, this is the dot product between two adjacent vertices of this base shape.
-    pub const fn vertex_cos_angle(self) -> f64 {
+    /// The cosine of [`edge_length`](BaseTriSphere::edge_length`), or equivalently, the dot
+    /// product between any two adjacent vertices.
+    pub const fn edge_cos_length(self) -> f64 {
         [C_1, 0.0][self as usize]
     }
 
@@ -145,7 +145,7 @@ impl crate::Face for Face {
 
     fn area(&self) -> f64 {
         use crate::Vertex;
-        // TODO: Convert to lookup table
+        // TODO: Replace with lookup table
         let v_0 = self.side(0).start().pos();
         let v_1 = self.side(1).start().pos();
         let v_2 = self.side(2).start().pos();
@@ -259,6 +259,19 @@ impl crate::HalfEdge for HalfEdge {
 
     fn side_index(&self) -> usize {
         (*self).side_index()
+    }
+
+    fn length(&self) -> f64 {
+        self.sphere().edge_length()
+    }
+
+    fn angle(&self) -> f64 {
+        use crate::Vertex;
+        // TODO: Replace with lookup table
+        let v_a = self.prev().start().pos();
+        let v_b = self.start().pos();
+        let v_c = self.next().start().pos();
+        crate::util::angle(v_a, v_b, v_c)
     }
 
     fn inside(&self) -> Face {

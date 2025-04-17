@@ -189,6 +189,21 @@ pub trait HalfEdge: Clone + Eq {
         self.start().outgoings().position(|h| h == *self).unwrap()
     }
 
+    /// The length of the edge.
+    /// 
+    /// For edges that are geodesics, this is equivalent to the [`util::dist`] between its
+    /// endpoints.
+    fn length(&self) -> f64;
+
+    /// The interior angle between the [previous half-edge](HalfEdge::prev) and this half-edge.
+    /// 
+    /// The sum of the angles of all [outgoing](Vertex::outgoings) half-edges at a vertex should
+    /// be `2 π`.
+    /// 
+    /// If both this edge, and the previous edge, are geodesics, the angle is equivalent to
+    /// [`util::angle`] where the `b` vertex is given by `self.start()`.
+    fn angle(&self) -> f64;
+
     /// Gets the [`Face`] whose interior boundary contains this half-edge.
     fn inside(&self) -> Self::Face;
 
