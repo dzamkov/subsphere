@@ -1,6 +1,6 @@
 //! Contains utility functions related to spheres, tessellations and projections.
+use crate::math::{mat, vec};
 use crate::{Face, HalfEdge, Sphere, Vertex};
-use crate::math::{vec, mat};
 
 /// Computes the distance between two points on the unit sphere, or equivalently, the angle between
 /// them in radians.
@@ -10,7 +10,7 @@ pub fn dist(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 
 /// Computes an interior angle on a spherical triangle.
-/// 
+///
 /// The vertices of the triangle are given. This will find the interior angle corresponding to
 /// vertex `b`.
 pub fn angle(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> f64 {
@@ -21,7 +21,7 @@ pub fn angle(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> f64 {
 }
 
 /// Computes the signed area of a spherical triangle with the given vertices.
-/// 
+///
 /// This will be positive if the points are in counter-clockwise order, negative if they
 /// are in clockwise order, and zero if they are collinear. If any of the points are not on
 /// the unit sphere, the result will be undefined.
@@ -35,7 +35,7 @@ pub fn tri_area(points: [[f64; 3]; 3]) -> f64 {
 }
 
 /// Computes the signed area of a spherical polygon with the given vertices.
-/// 
+///
 /// This will be positive if the points are in counter-clockwise order or negative if they
 /// are in clockwise order. If any of the points are not on the unit sphere, the result will be
 /// undefined.
@@ -55,7 +55,7 @@ pub fn poly_area(mut points: impl Iterator<Item = [f64; 3]>) -> f64 {
 }
 
 /// Validates the internal consistency of the given [`Sphere`].
-/// 
+///
 /// This will panic if any of the requirements for a sphere are not met. Since this is a violation
 /// of the invariants of the [`Sphere`] trait, this is not a recoverable error.
 pub fn validate<S: Sphere>(sphere: S)
@@ -144,6 +144,16 @@ where
             v,
             2.0 * std::f64::consts::PI,
             total_angle
+        );
+    }
+
+    // Validate face containment
+    for v in sphere.vertices() {
+        let f = sphere.face_at(v.pos());
+        assert!(
+            f.vertices().any(|x| x == v),
+            "vertex {:?} is not contained by a connected face",
+            v
         );
     }
 }

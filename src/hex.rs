@@ -176,6 +176,10 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Sphere for HexSphere<Pro
         }
     }
 
+    fn face_at(&self, point: [f64; 3]) -> Face<Proj> {
+        todo!()
+    }
+
     fn num_vertices(&self) -> usize {
         self.dual_num_divisions() * self.kis.base().num_faces()
     }

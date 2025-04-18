@@ -64,6 +64,12 @@ pub trait Sphere {
     /// Iterates over the faces of this sphere.
     fn faces(&self) -> impl Iterator<Item = Self::Face>;
 
+    /// Determines which face contains the given point on the unit sphere.
+    /// 
+    /// If the point is between faces (i.e. on a vertex or edge), one of the faces that contains
+    /// it inclusively will be returned.
+    fn face_at(&self, point: [f64; 3]) -> Self::Face;
+
     /// The number of vertices on this sphere.
     fn num_vertices(&self) -> usize;
 
@@ -138,7 +144,9 @@ pub trait Vertex: Clone + Eq {
     /// The index of this vertex within the [`Sphere::vertices`] list.
     fn index(&self) -> usize;
 
-    /// The position (or equivalently, the normal) of this vertex.
+    /// The position of this vertex.
+    /// 
+    /// This is guaranteed to be a unit-length vector.
     fn pos(&self) -> [f64; 3];
 
     /// The number of edges (or equivalently, [`Face`]s) that are connected to this vertex.

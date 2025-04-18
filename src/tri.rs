@@ -141,6 +141,10 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Sphere for TriSphere<Pro
         self.clone().faces_from(self.base().first_region())
     }
 
+    fn face_at(&self, point: [f64; 3]) -> Face<Proj> {
+        todo!()
+    }
+
     fn num_vertices(&self) -> usize {
         self.num_faces() / 2 + 2
     }

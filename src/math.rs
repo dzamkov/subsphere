@@ -17,10 +17,12 @@ pub(crate) mod vec {
 
     /// Adds `a` to `b`.
     #[inline]
-    pub fn add<const N: usize>(a: [f64; N], b: [f64; N]) -> [f64; N] {
+    pub const fn add<const N: usize>(a: [f64; N], b: [f64; N]) -> [f64; N] {
         let mut res = [0.0; N];
-        for i in 0..N {
+        let mut i = 0;
+        while i < N {
             res[i] = a[i] + b[i];
+            i += 1;
         }
         res
     }
@@ -37,10 +39,12 @@ pub(crate) mod vec {
 
     /// Multiplies a vector by a scalar.
     #[inline]
-    pub fn mul<const N: usize>(a: [f64; N], b: f64) -> [f64; N] {
+    pub const fn mul<const N: usize>(a: [f64; N], b: f64) -> [f64; N] {
         let mut res = [0.0; N];
-        for i in 0..N {
+        let mut i = 0;
+        while i < N {
             res[i] = a[i] * b;
+            i += 1;
         }
         res
     }
@@ -57,10 +61,12 @@ pub(crate) mod vec {
 
     /// Computes the dot product of two vectors.
     #[inline]
-    pub fn dot<const N: usize>(a: [f64; N], b: [f64; N]) -> f64 {
+    pub const fn dot<const N: usize>(a: [f64; N], b: [f64; N]) -> f64 {
         let mut res = 0.0;
-        for i in 0..N {
+        let mut i = 0;
+        while i < N {
             res += a[i] * b[i];
+            i += 1;
         }
         res
     }
