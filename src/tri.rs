@@ -7,8 +7,7 @@ use crate::basetri::Face as BaseFace;
 use crate::basetri::HalfEdge as BaseHalfEdge;
 use crate::basetri::Vertex as BaseVertex;
 use crate::math::vec;
-use crate::proj::TriangleProjection;
-use crate::proj::{self, BaseTriSphereProjection};
+use crate::proj::{self, Projection, BaseTriProjector};
 use std::num::NonZero;
 
 /// A tessellation of the unit sphere into triangular [`Face`]s constructed by subdividing a
@@ -50,7 +49,7 @@ impl<Proj> TriSphere<Proj> {
         unsafe { std::mem::transmute((self.c_base & 0b11) as u8) }
     }
 
-    /// The [`BaseTriSphereProjection`] for this sphere.
+    /// The [`BaseTriProjector`] for this sphere.
     pub const fn proj(&self) -> &Proj {
         &self.proj
     }
@@ -105,7 +104,7 @@ impl<Proj> TriSphere<Proj> {
     }
 }
 
-impl<Proj: Clone + BaseTriSphereProjection> TriSphere<Proj> {
+impl<Proj: Clone + BaseTriProjector> TriSphere<Proj> {
     /// Subdivides each edge of this [`TriSphere`] into the given number of segments.
     pub fn subdivide_edge(&self, divs: NonZero<u32>) -> Self {
         Self::new(
@@ -117,13 +116,13 @@ impl<Proj: Clone + BaseTriSphereProjection> TriSphere<Proj> {
     }
 }
 
-impl<Proj: BaseTriSphereProjection + Default> From<BaseTriSphere> for TriSphere<Proj> {
+impl<Proj: BaseTriProjector + Default> From<BaseTriSphere> for TriSphere<Proj> {
     fn from(base: BaseTriSphere) -> Self {
         Self::new(base, Proj::default(), NonZero::new(1).unwrap(), 0)
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Sphere for TriSphere<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
     type Face = Face<Proj>;
     type Vertex = Vertex<Proj>;
     type HalfEdge = HalfEdge<Proj>;
@@ -188,7 +187,7 @@ pub struct Face<Proj> {
     boundary_along_v: bool,
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> Face<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
     /// The approximate position of the center of this face.
     ///
     /// There is no strict definition or guarantees for this function, other than that the
@@ -222,7 +221,7 @@ fn test_center() {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Face for Face<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::Face for Face<Proj> {
     type Vertex = Vertex<Proj>;
     type HalfEdge = HalfEdge<Proj>;
 
@@ -311,7 +310,7 @@ pub struct Vertex<Proj> {
     pub(crate) v: u32,
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> Vertex<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
     /// Constructs a [`Vertex`] with the given properties.
     ///
     /// This will normalize the vertex `region` to be its proper owner.
@@ -498,7 +497,7 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Vertex<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Vertex for Vertex<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::Vertex for Vertex<Proj> {
     type Face = Face<Proj>;
     type HalfEdge = HalfEdge<Proj>;
 
@@ -849,7 +848,7 @@ impl<Proj> HalfEdge<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::HalfEdge for HalfEdge<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
     type Vertex = Vertex<Proj>;
     type Face = Face<Proj>;
 
@@ -1017,7 +1016,7 @@ pub struct FaceIter<Proj> {
     boundary_along_v: bool,
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for FaceIter<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
     type Item = Face<Proj>;
     fn next(&mut self) -> Option<Face<Proj>> {
         loop {
@@ -1113,7 +1112,7 @@ pub struct VertexIter<Proj> {
     v: u32,
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for VertexIter<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> Iterator for VertexIter<Proj> {
     type Item = Vertex<Proj>;
     fn next(&mut self) -> Option<Vertex<Proj>> {
         loop {
@@ -1252,9 +1251,9 @@ impl BaseTriSphere {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> TriSphere<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> TriSphere<Proj> {
     /// Gets the [`RegionProjection`] for the given region.
-    fn region_proj(&self, region: BaseRegion) -> RegionProjection<impl proj::TriangleProjection> {
+    fn region_proj(&self, region: BaseRegion) -> RegionProjection<impl proj::Projection> {
         let b = self.b() as f64;
         let c = self.c() as f64;
         let w_total = b * b + b * c + c * c;
@@ -1301,7 +1300,7 @@ enum RegionProjection<Base> {
     },
 }
 
-impl<Base: proj::TriangleProjection> RegionProjection<Base> {
+impl<Base: proj::Projection> RegionProjection<Base> {
     /// Projects a point in the local coordinate space of this region to a point on the sphere.
     pub fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3] {
         match self {

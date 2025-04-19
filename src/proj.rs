@@ -8,75 +8,38 @@ use crate::tri::TriSphere;
 
 pub use fuller::Fuller;
 pub use gnomonic::Gnomonic;
-pub use tri::{BaseTriSphereProjection, TriSphereProjection};
+pub use tri::{BaseTriProjector, TriProjector};
 
-/// Maps local coordinates on a planar triangle to points on the unit sphere.
-///
-/// The local coordinates are defined like so:
-/// ```text
-///           p₂
-///         [0, b]
-///          /  \
-///         /    \
-///        /      \
-///       /        \
-///      /          \
-///     /            \
-/// [0, 0] -------- [a, 0]
-///   p₀              p₁
-/// ```
-pub trait TriangleProjection {
-    /// Projects a point in the local coordinates of the triangle to a point on the unit sphere.
-    ///
-    /// This may assume that the given coordinates, `[u, v]` satisfy `0 <= u`, `0 <= v`, and
-    /// `u + v <= a`.
+/// Maps two-dimensional "local" coordinates to points on the unit sphere.
+/// 
+/// The domain and range of the projection function may be restricted, e.g. local coordinates
+/// may be restricted to a triangle or rectangle, and only a small section of the unit sphere
+/// may be covered.
+pub trait Projection {
+    /// Projects a point in the local coordinates to a point on the unit sphere.
+    /// 
+    /// If the given local coordinates are not in the domain of the projection, the result is
+    /// undefined.
     fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3];
 
-    /// Projects a point on the unit sphere to a point in the local coordinates of the triangle.
+    /// Projects a point on the unit sphere to a point in the local coordinates.
+    /// 
+    /// If the given point is not in the range of the projection, the result is undefined.
     #[expect(clippy::wrong_self_convention)]
     fn from_sphere(&self, point: [f64; 3]) -> [f64; 2];
 
-    /// The type of [`TriangleProjection`] resulting from a call to
-    /// [`transform`](TriangleProjection::transform).
-    type Transform: TriangleProjection;
+    /// The type of [`Projection`] resulting from a call to [`transform`](Projection::transform).
+    type Transform: Projection;
 
     /// Applies an affine transformation to the local coordinates of this projection.
     ///
-    /// More concretely, the [`to_sphere`](TriangleProjection::transform) method on the returned
+    /// More concretely, the [`to_sphere`](Projection::transform) method on the returned
     /// projection will compute `self.to_sphere(offset + linear * input)`, where `offset` is
     /// interpreted as a vector and `linear` is interpreted as a 2x2 matrix column-major matrix.
     fn transform(self, offset: [f64; 2], linear: [[f64; 2]; 2]) -> Self::Transform;
 }
 
-/// Maps local coordinates on a planar rectangle to points on the unit sphere.
-///
-/// The local coordinates are defined like so:
-/// ```text
-///   p₃              p₂
-/// [0, c] -------- [b, c]
-///   |               |
-///   |               |
-///   |               |
-///   |               |
-///   |               |
-/// [0, 0] -------- [b, 0]
-///   p₀              p₁
-/// ```
-pub trait RectangleProjection {
-    /// Projects a point in the local coordinates of the rectangle to a point on the unit
-    /// sphere.
-    ///
-    /// This may assume that the given coordinates, `[u, v]` satisfy `0 <= u <= b` and
-    /// `0 <= v <= c`.
-    fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3];
-
-    /// Projects a point on the unit sphere to a point in the local coordinates of the
-    /// rectangle.
-    #[expect(clippy::wrong_self_convention)]
-    fn from_sphere(&self, point: [f64; 3]) -> [f64; 2];
-}
-
-/// A general implementation of [`TriangleProjection::transform`].
+/// A general implementation of [`Projection::transform`].
 #[derive(Debug)]
 pub struct Transform<T> {
     source: T,
@@ -97,7 +60,7 @@ impl<T> Transform<T> {
     }
 }
 
-impl<T: TriangleProjection> TriangleProjection for Transform<T> {
+impl<T: Projection> Projection for Transform<T> {
     fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3] {
         self.source
             .to_sphere(vec::add(self.offset, mat::apply(self.linear, coords)))
@@ -117,27 +80,53 @@ impl<T: TriangleProjection> TriangleProjection for Transform<T> {
 pub mod tri {
     use super::*;
 
-    /// A general projection method which can be used to create a [`TriangleProjection`] for
-    /// any spherical triangle.
-    pub trait TriSphereProjection: BaseTriSphereProjection {
-        /// Constructs a [`TriangleProjection`] for a specified spherical triangle.
+    /// A general projection method which can be used to create a [`Projection`] for any
+    /// spherical triangle.
+    pub trait TriProjector: BaseTriProjector {
+        /// Constructs a [`Projection`] for a specified spherical triangle.
         ///
         /// The points must be on the unit sphere, in counter-clockwise order, and strictly
         /// contained in one hemisphere. The edges of the triangle are geodesics. The length
         /// of each edge in the local coordinate space is assumed to be `1`.
+        /// 
+        /// The local coordinates are defined like so:
+        /// ```text
+        ///           p₂
+        ///         [0, 1]
+        ///          /  \
+        ///         /    \
+        ///        /      \
+        ///       /        \
+        ///      /          \
+        ///     /            \
+        /// [0, 0] -------- [1, 0]
+        ///   p₀              p₁
+        /// ```
         fn triangle(&self, points: [[f64; 3]; 3]) -> Self::Triangle;
     }
 
-    /// A projection method which can be used to create a [`TriangleProjection`] for any face of a
+    /// A general projection method which can be used to create a [`Projection`] for any face of a
     /// [`BaseTriSphere`].
-    pub trait BaseTriSphereProjection {
-        /// The type of [`TriangleProjection`] used for a [`basetri::Face`].
-        type Triangle: TriangleProjection;
+    pub trait BaseTriProjector {
+        /// The type of [`Projection`] used for a [`basetri::Face`].
+        type Triangle: Projection;
 
-        /// Constructs a [`TriangleProjection`] for the [`inside`](crate::HalfEdge::inside) face
+        /// Constructs a [`Projection`] for the [`inside`](crate::HalfEdge::inside) face
         /// of the given edge, oriented such that the U axis goes along the edge.
         ///
         /// The length of each edge in the local coordinate space is assumed to be `1`.
+        /// 
+        /// The local coordinates are defined like so:
+        /// ```text
+        ///         [0, 1]
+        ///          /  \
+        ///         /    \
+        ///        V      \
+        ///       /        \
+        ///      /          \
+        ///     /            \
+        /// [0, 0] --- U -- [1, 0]
+        /// ```
         fn inside(&self, edge: basetri::HalfEdge) -> Self::Triangle;
     }
 }
@@ -145,7 +134,6 @@ pub mod tri {
 /// Contains types related to the [`Gnomonic`] projection.
 pub mod gnomonic {
     use super::*;
-    use crate::Vertex;
 
     /// The [gnomonic](https://en.wikipedia.org/wiki/Gnomonic_projection) projection.
     ///
@@ -159,7 +147,7 @@ pub mod gnomonic {
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
     pub struct Gnomonic;
 
-    impl TriSphereProjection for Gnomonic {
+    impl TriProjector for Gnomonic {
         fn triangle(&self, [p_0, p_1, p_2]: [[f64; 3]; 3]) -> Planar {
             Planar {
                 offset: p_0,
@@ -169,7 +157,7 @@ pub mod gnomonic {
         }
     }
 
-    impl BaseTriSphereProjection for Gnomonic {
+    impl BaseTriProjector for Gnomonic {
         type Triangle = Planar;
         fn inside(&self, edge: basetri::HalfEdge) -> Planar {
             self.triangle([
@@ -180,8 +168,7 @@ pub mod gnomonic {
         }
     }
 
-    /// A [`TriangleProjection`] or [`RectangleProjection`] for a planar region using
-    /// the [`Gnomonic`] projection.
+    /// A [`Projection`] for a planar region using the [`Gnomonic`] projection.
     #[derive(Clone, Copy, Debug)]
     pub struct Planar {
         /// The position of the origin of the local coordinate space of the triangle.
@@ -196,29 +183,13 @@ pub mod gnomonic {
         v: [f64; 3],
     }
 
-    impl Planar {
-        /// Projects a point in the local coordinates of the planar region to a point on the unit
-        /// sphere.
-        #[expect(clippy::wrong_self_convention)]
+    impl Projection for Planar {
         fn to_sphere(&self, [u, v]: [f64; 2]) -> [f64; 3] {
             vec::normalize(vec::add(self.offset, mat::apply([self.u, self.v], [u, v])))
         }
 
-        /// Projects a point on the unit sphere to a point in the local coordinates of the
-        /// planar region.
-        #[expect(clippy::wrong_self_convention)]
         fn from_sphere(&self, point: [f64; 3]) -> [f64; 2] {
             todo!()
-        }
-    }
-
-    impl TriangleProjection for Planar {
-        fn to_sphere(&self, [u, v]: [f64; 2]) -> [f64; 3] {
-            Planar::to_sphere(self, [u, v])
-        }
-
-        fn from_sphere(&self, point: [f64; 3]) -> [f64; 2] {
-            Planar::from_sphere(self, point)
         }
 
         type Transform = Self;
@@ -230,31 +201,20 @@ pub mod gnomonic {
             }
         }
     }
-
-    impl RectangleProjection for Planar {
-        fn to_sphere(&self, [u, v]: [f64; 2]) -> [f64; 3] {
-            Planar::to_sphere(self, [u, v])
-        }
-
-        fn from_sphere(&self, point: [f64; 3]) -> [f64; 2] {
-            Planar::from_sphere(self, point)
-        }
-    }
 }
 
 /// Contains types related to the [`Fuller`] projection.
 pub mod fuller {
     use super::*;
-    use crate::Vertex;
 
-    /// The [Fuller](https://en.wikipedia.org/wiki/Dymaxion_map) projection.
+    /// The [Fuller](https://en.wikipedia.org/wiki/Dymaxion_map) projection method.
     ///
     /// This projection preserves distances exactly along the boundaries of base triangles.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
     pub struct Fuller;
 
     impl Fuller {
-        /// Constructs a [`TriangleProjection`] for a specified spherical triangle. The triangle
+        /// Constructs a [`Projection`] for a specified spherical triangle. The triangle
         /// must be equilateral, with the angle between any two endpoints equal to `angle`.
         pub fn triangle(self, angle: f64, points: [[f64; 3]; 3]) -> Triangle {
             // TODO: Validate triangle when debug assertions are on
@@ -262,7 +222,7 @@ pub mod fuller {
         }
     }
 
-    impl BaseTriSphereProjection for Fuller {
+    impl BaseTriProjector for Fuller {
         type Triangle = Triangle;
         fn inside(&self, edge: basetri::HalfEdge) -> Triangle {
             self.triangle(
@@ -276,7 +236,7 @@ pub mod fuller {
         }
     }
 
-    /// A [`TriangleProjection`] for an equilateral triangle using the [`Fuller`] projection.
+    /// A [`Projection`] for an equilateral triangle using the [`Fuller`] projection.
     #[derive(Clone, Copy, Debug)]
     pub struct Triangle {
         /// The angle, in radians, between any two endpoints of the triangle.
@@ -286,7 +246,7 @@ pub mod fuller {
         points: [[f64; 3]; 3],
     }
 
-    impl TriangleProjection for Triangle {
+    impl Projection for Triangle {
         fn to_sphere(&self, [u, v]: [f64; 2]) -> [f64; 3] {
             // Special handling for boundaries to improve accuracy and performance
             if v <= 0.0 {

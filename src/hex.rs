@@ -2,7 +2,7 @@
 use crate::Face as FaceExt;
 use crate::HalfEdge as HalfEdgeExt;
 use crate::Vertex as VertexExt;
-use crate::proj::BaseTriSphereProjection;
+use crate::proj::BaseTriProjector;
 use crate::tri::{self, BaseRegion, BaseRegionType, TriSphere};
 use std::num::NonZero;
 
@@ -17,7 +17,7 @@ pub struct HexSphere<Proj> {
     kis: TriSphere<Proj>,
 }
 
-impl<Proj: Clone + BaseTriSphereProjection> TriSphere<Proj> {
+impl<Proj: Clone + BaseTriProjector> TriSphere<Proj> {
     /// [Truncates](https://en.wikipedia.org/wiki/Truncation_(geometry)) the vertices of this
     /// [`TriSphere`] to create a [`HexSphere`].
     ///
@@ -153,7 +153,7 @@ fn test_num_faces_on_interior() {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Sphere for HexSphere<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
     type Face = Face<Proj>;
     type Vertex = Vertex<Proj>;
     type HalfEdge = HalfEdge<Proj>;
@@ -206,7 +206,7 @@ pub struct Face<Proj> {
     center: tri::Vertex<Proj>,
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> Face<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
     /// Constructs a [`Face`] from the given central vertex.
     fn new(center: tri::Vertex<Proj>) -> Self {
         debug_assert_eq!(center.u % 3, center.adjusted_v() % 3);
@@ -226,7 +226,7 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Face<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Face for Face<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::Face for Face<Proj> {
     type Vertex = Vertex<Proj>;
     type HalfEdge = HalfEdge<Proj>;
 
@@ -308,7 +308,7 @@ impl<Proj: Clone> Vertex<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::Vertex for Vertex<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::Vertex for Vertex<Proj> {
     type Face = Face<Proj>;
     type HalfEdge = HalfEdge<Proj>;
 
@@ -367,7 +367,7 @@ impl<Proj> HalfEdge<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> crate::HalfEdge for HalfEdge<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
     type Face = Face<Proj>;
     type Vertex = Vertex<Proj>;
 
@@ -491,7 +491,7 @@ pub struct FaceIter<Proj> {
     v: u32,
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for FaceIter<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
     type Item = Face<Proj>;
     fn next(&mut self) -> Option<Face<Proj>> {
         loop {
@@ -541,7 +541,7 @@ impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for FaceIter<Proj> {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> HexSphere<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> HexSphere<Proj> {
     /// Iterates over the vertices of this [`HexSphere`], starting with the given region.
     fn vertices_from(self, region: BaseRegion) -> VertexIter<Proj> {
         let b = self.kis.b();
@@ -591,7 +591,7 @@ pub struct VertexIter<Proj> {
     skip: bool,
 }
 
-impl<Proj: Eq + Clone + BaseTriSphereProjection> Iterator for VertexIter<Proj> {
+impl<Proj: Eq + Clone + BaseTriProjector> Iterator for VertexIter<Proj> {
     type Item = Vertex<Proj>;
     fn next(&mut self) -> Option<Vertex<Proj>> {
         loop {

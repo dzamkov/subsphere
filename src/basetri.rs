@@ -606,7 +606,7 @@ static ICOSA_FACE_AT: [Face; 243] = const {
 /// The indexing scheme is arbitrary, but points on different [`Face`]s must have different
 /// indices.
 const fn octo_point_index([x, y, z]: [f64; 3]) -> u8 {
-    ((x >= 0.0) as u8) << 2 | ((y >= 0.0) as u8) << 1 | ((z >= 0.0) as u8)
+    (((x >= 0.0) as u8) << 2) | (((y >= 0.0) as u8) << 1) | ((z >= 0.0) as u8)
 }
 
 /// A compact lookup table which identifies which [`Face`] corresponds to a particular result
