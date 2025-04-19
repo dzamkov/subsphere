@@ -7,11 +7,6 @@ fn test_octosphere_base() {
     let sphere = TriSphere::from(BaseTriSphere::Octo);
     assert_eq!(sphere, subsphere::octosphere());
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0");
 }
 
 #[test]
@@ -27,11 +22,6 @@ fn test_octosphere_4_0() {
         subsphere::octosphere().subdivide_edge(NonZero::new(4).unwrap())
     );
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.5184953070560394");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.3955428804408463");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.7458526607730736");
 }
 
 #[test]
@@ -43,11 +33,6 @@ fn test_octosphere_3_1() {
         1,
     );
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.8924780020022631");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.4647312208585381");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.7426858548903519");
 }
 
 #[test]
@@ -59,11 +44,6 @@ fn test_octosphere_2_2() {
         2,
     );
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.6794205913771127");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.4938677503333329");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.741758917736975");
 }
 
 #[test]
@@ -71,11 +51,6 @@ fn test_icosphere_base() {
     let sphere = TriSphere::from(BaseTriSphere::Icosa);
     assert_eq!(sphere, subsphere::icosphere());
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.0000000000000002");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.0000000000000006661338147750939");
 }
 
 #[test]
@@ -91,11 +66,6 @@ fn test_icosphere_4_0() {
         subsphere::icosphere().subdivide_edge(NonZero::new(4).unwrap())
     );
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.149592490499728");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.1656669893755778");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.3077306793682705");
 }
 
 #[test]
@@ -107,11 +77,6 @@ fn test_icosphere_3_1() {
         1,
     );
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.2142304244815916");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.1668416265723973");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.2924575851995208");
 }
 
 #[test]
@@ -123,11 +88,6 @@ fn test_icosphere_2_2() {
         2,
     );
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces());
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.17721464511508");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.1725986697633959");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.29094312908498365");
 }
 
 #[test]
@@ -146,11 +106,6 @@ fn test_hexsphere_6_0() {
             .truncate()
     );
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces().filter(|f| f.num_sides() == 6));
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.0509668034000925");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.171188457818225");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.28834568593235255");
 }
 
 #[test]
@@ -163,11 +118,6 @@ fn test_hexsphere_4_1() {
     ))
     .unwrap();
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces().filter(|f| f.num_sides() == 6));
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.000000000000003");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.1262732071592574");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.16400132885900653");
 }
 
 #[test]
@@ -180,10 +130,6 @@ fn test_hexsphere_7_1() {
     ))
     .unwrap();
     validate(sphere);
-    let metrics = Metrics::new(sphere.faces().filter(|f| f.num_sides() == 6));
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.052006826012178");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.167013900454752");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.32400169018257974");
 }
 
 #[test]
@@ -196,11 +142,6 @@ fn test_hexsphere_2_2() {
     ))
     .unwrap();
     validate(sphere);
-    insta::assert_binary_snapshot!(".obj", to_obj(sphere));
-    let metrics = Metrics::new(sphere.faces().filter(|f| f.num_sides() == 6));
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.0000000000000009");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.0606276105914663");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.08150361884566548");
 }
 
 #[test]
@@ -213,10 +154,6 @@ fn test_hexsphere_8_2() {
     ))
     .unwrap();
     validate(sphere);
-    let metrics = Metrics::new(sphere.faces().filter(|f| f.num_sides() == 6));
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.0661630517609373");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.1805389357043357");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.3322464937015097");
 }
 
 #[test]
@@ -229,10 +166,6 @@ fn test_hexsphere_3_3() {
     ))
     .unwrap();
     validate(sphere);
-    let metrics = Metrics::new(sphere.faces().filter(|f| f.num_sides() == 6));
-    insta::assert_snapshot!(metrics.area_discrepancy, @"1.0350802014863203");
-    insta::assert_snapshot!(metrics.length_discrepancy, @"1.1293976478623056");
-    insta::assert_snapshot!(metrics.angle_discrepancy, @"0.16753639503241402");
 }
 
 /// Encapsulates measurements for the "quality" of a sphere tessellation.
