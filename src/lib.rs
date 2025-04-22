@@ -19,10 +19,10 @@ use std::num::NonZero;
 ///
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
-pub fn icosphere() -> TriSphere<proj::Fuller> {
+pub fn icosphere() -> TriSphere<proj::Gnomonic> {
     TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(1).unwrap(),
         0,
     )
@@ -32,10 +32,10 @@ pub fn icosphere() -> TriSphere<proj::Fuller> {
 ///
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
-pub fn octosphere() -> TriSphere<proj::Fuller> {
+pub fn octosphere() -> TriSphere<proj::Gnomonic> {
     TriSphere::new(
         BaseTriSphere::Octo,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(1).unwrap(),
         0,
     )

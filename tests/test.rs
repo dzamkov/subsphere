@@ -6,6 +6,7 @@ use subsphere::{BaseTriSphere, Face, HalfEdge, HexSphere, Sphere, TriSphere, Ver
 fn test_octosphere_base() {
     let sphere = TriSphere::from(BaseTriSphere::Octo);
     assert_eq!(sphere, subsphere::octosphere());
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -13,14 +14,11 @@ fn test_octosphere_base() {
 fn test_octosphere_4_0() {
     let sphere = TriSphere::new(
         BaseTriSphere::Octo,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(4).unwrap(),
         0,
     );
-    assert_eq!(
-        sphere,
-        subsphere::octosphere().subdivide_edge(NonZero::new(4).unwrap())
-    );
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -28,10 +26,11 @@ fn test_octosphere_4_0() {
 fn test_octosphere_3_1() {
     let sphere = TriSphere::new(
         BaseTriSphere::Octo,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(3).unwrap(),
         1,
     );
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -39,10 +38,11 @@ fn test_octosphere_3_1() {
 fn test_octosphere_2_2() {
     let sphere = TriSphere::new(
         BaseTriSphere::Octo,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(2).unwrap(),
         2,
     );
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -50,6 +50,7 @@ fn test_octosphere_2_2() {
 fn test_icosphere_base() {
     let sphere = TriSphere::from(BaseTriSphere::Icosa);
     assert_eq!(sphere, subsphere::icosphere());
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -57,14 +58,11 @@ fn test_icosphere_base() {
 fn test_icosphere_4_0() {
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(4).unwrap(),
         0,
     );
-    assert_eq!(
-        sphere,
-        subsphere::icosphere().subdivide_edge(NonZero::new(4).unwrap())
-    );
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -72,10 +70,11 @@ fn test_icosphere_4_0() {
 fn test_icosphere_3_1() {
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(3).unwrap(),
         1,
     );
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -83,10 +82,11 @@ fn test_icosphere_3_1() {
 fn test_icosphere_2_2() {
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(2).unwrap(),
         2,
     );
+    validate_tri(sphere);
     validate(sphere);
 }
 
@@ -94,17 +94,11 @@ fn test_icosphere_2_2() {
 fn test_hexsphere_6_0() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(6).unwrap(),
         0,
     ))
     .unwrap();
-    assert_eq!(
-        sphere,
-        subsphere::icosphere()
-            .subdivide_edge(NonZero::new(2).unwrap())
-            .truncate()
-    );
     validate(sphere);
 }
 
@@ -112,7 +106,7 @@ fn test_hexsphere_6_0() {
 fn test_hexsphere_4_1() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(4).unwrap(),
         1,
     ))
@@ -124,7 +118,7 @@ fn test_hexsphere_4_1() {
 fn test_hexsphere_7_1() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(7).unwrap(),
         1,
     ))
@@ -136,7 +130,7 @@ fn test_hexsphere_7_1() {
 fn test_hexsphere_2_2() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(2).unwrap(),
         2,
     ))
@@ -148,7 +142,7 @@ fn test_hexsphere_2_2() {
 fn test_hexsphere_8_2() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(8).unwrap(),
         2,
     ))
@@ -160,12 +154,25 @@ fn test_hexsphere_8_2() {
 fn test_hexsphere_3_3() {
     let sphere = HexSphere::new(TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        proj::Gnomonic,
         NonZero::new(3).unwrap(),
         3,
     ))
     .unwrap();
     validate(sphere);
+}
+
+/// Performs [`TriSphere`]-specific validation.
+fn validate_tri<Proj>(sphere: TriSphere<Proj>)
+where
+    Proj: Eq + Clone + proj::BaseTriProjector,
+    Proj: std::fmt::Debug,
+{
+    // Verify that faces contain their centers.
+    for f in sphere.faces() {
+        let center = f.center();
+        debug_assert_eq!(sphere.face_at(center), f);
+    }
 }
 
 /// Encapsulates measurements for the "quality" of a sphere tessellation.

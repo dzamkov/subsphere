@@ -102,10 +102,23 @@ pub(crate) mod mat {
         res
     }
 
-    /// Computes the determinant of a matrix.
+    /// Computes the determinant of a 3x3 matrix.
     #[inline]
-    pub fn det(m: [[f64; 3]; 3]) -> f64 {
+    pub fn det_3(m: [[f64; 3]; 3]) -> f64 {
         vec::dot(m[0], vec::cross(m[1], m[2]))
+    }
+
+    /// Computes the determinant of a 2x2 matrix.
+    #[inline]
+    pub fn det_2(m: [[f64; 2]; 2]) -> f64 {
+        m[0][0] * m[1][1] - m[0][1] * m[1][0]
+    }
+
+    /// Computes the adjoint of a 2x2 matrix.
+    #[inline]
+    pub fn adjoint_2(m: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+        let [[a, b], [c, d]] = m;
+        [[d, -b], [-c, a]]
     }
 }
 

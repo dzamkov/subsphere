@@ -31,7 +31,7 @@ pub fn tri_area(points: [[f64; 3]; 3]) -> f64 {
         + vec::dot(points[0], points[1])
         + vec::dot(points[1], points[2])
         + vec::dot(points[2], points[0]);
-    (mat::det(points) / d).atan() * 2.0
+    (mat::det_3(points) / d).atan() * 2.0
 }
 
 /// Computes the signed area of a spherical polygon with the given vertices.

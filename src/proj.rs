@@ -18,13 +18,14 @@ pub use tri::{BaseTriProjector, TriProjector};
 pub trait Projection {
     /// Projects a point in the local coordinates to a point on the unit sphere.
     /// 
-    /// If the given local coordinates are not in the domain of the projection, the result is
-    /// undefined.
+    /// This is the inverse of [`from_sphere`](Projection::from_sphere). If the given local
+    /// coordinates are not in the domain of the projection, the result is undefined.
     fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3];
 
     /// Projects a point on the unit sphere to a point in the local coordinates.
     /// 
-    /// If the given point is not in the range of the projection, the result is undefined.
+    /// This is the inverse of [`to_sphere`](Projection::to_sphere). If the given point is not in
+    /// the range of the projection, the result is undefined.
     #[expect(clippy::wrong_self_convention)]
     fn from_sphere(&self, point: [f64; 3]) -> [f64; 2];
 
@@ -149,10 +150,16 @@ pub mod gnomonic {
 
     impl TriProjector for Gnomonic {
         fn triangle(&self, [p_0, p_1, p_2]: [[f64; 3]; 3]) -> Planar {
+            let u = vec::sub(p_1, p_0);
+            let v = vec::sub(p_2, p_0);
+            let normal = vec::cross(u, v);
+            let normal = vec::div(normal, vec::dot(normal, p_0));
             Planar {
                 offset: p_0,
-                u: vec::sub(p_1, p_0),
-                v: vec::sub(p_2, p_0),
+                normal,
+                u,
+                v,
+                inv_linear: inv_linear(u, v),
             }
         }
     }
@@ -174,6 +181,11 @@ pub mod gnomonic {
         /// The position of the origin of the local coordinate space of the triangle.
         offset: [f64; 3],
 
+        /// A vector which is both normal to the plane and on the plane.
+        /// 
+        /// It follows that every vector `p` which is on the plane satisfies `dot(normal, p) = 1`.
+        normal: [f64; 3],
+
         /// The movement of the unnormalized point for each step in the `u` direction of the
         /// local coordinate space.
         u: [f64; 3],
@@ -181,6 +193,16 @@ pub mod gnomonic {
         /// The movement of the unnormalized point for each step in the `v` direction of the
         /// local coordinate space.
         v: [f64; 3],
+
+        /// The inverse of the matrix:
+        /// 
+        /// ```text
+        /// [dot(u, u), dot(u, v)]
+        /// [dot(u, v), dot(v, v)]
+        /// ```
+        /// 
+        /// Used for implementing [`Projection::from_sphere`].
+        inv_linear: [[f64; 2]; 2],
     }
 
     impl Projection for Planar {
@@ -189,17 +211,37 @@ pub mod gnomonic {
         }
 
         fn from_sphere(&self, point: [f64; 3]) -> [f64; 2] {
-            todo!()
+            let point = vec::div(point, vec::dot(self.normal, point));
+            let diff = vec::sub(point, self.offset);
+            let dot_u = vec::dot(self.u, diff);
+            let dot_v = vec::dot(self.v, diff);
+            mat::apply(self.inv_linear, [dot_u, dot_v])
         }
 
         type Transform = Self;
         fn transform(self, offset: [f64; 2], linear: [[f64; 2]; 2]) -> Self {
+            let u = mat::apply([self.u, self.v], linear[0]);
+            let v = mat::apply([self.u, self.v], linear[1]);
             Planar {
                 offset: vec::add(self.offset, mat::apply([self.u, self.v], offset)),
-                u: mat::apply([self.u, self.v], linear[0]),
-                v: mat::apply([self.u, self.v], linear[1]),
+                normal: self.normal,
+                u,
+                v,
+                inv_linear: inv_linear(u, v),
             }
         }
+    }
+
+    /// Computes [`Planar::inv_linear`] based on the vectors `u` and `v`.
+    fn inv_linear(u: [f64; 3], v: [f64; 3]) -> [[f64; 2]; 2] {
+        let dot_u_u = vec::dot(u, u);
+        let dot_v_v = vec::dot(v, v);
+        let dot_u_v = vec::dot(u, v);
+        let det = dot_u_u * dot_v_v - dot_u_v * dot_u_v;
+        [
+            [dot_v_v / det, -dot_u_v / det],
+            [-dot_u_v / det, dot_u_u / det],
+        ]
     }
 }
 

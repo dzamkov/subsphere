@@ -1,13 +1,14 @@
 //! Contains types related to [`TriSphere`].
 use crate::Face as FaceExt;
+use crate::HalfEdge as HalfEdgeExt;
 use crate::Sphere as SphereExt;
 use crate::Vertex as VertexExt;
 use crate::basetri::BaseTriSphere;
 use crate::basetri::Face as BaseFace;
 use crate::basetri::HalfEdge as BaseHalfEdge;
 use crate::basetri::Vertex as BaseVertex;
-use crate::math::vec;
-use crate::proj::{self, Projection, BaseTriProjector};
+use crate::math::{mat, vec};
+use crate::proj::{BaseTriProjector, Projection};
 use std::num::NonZero;
 
 /// A tessellation of the unit sphere into triangular [`Face`]s constructed by subdividing a
@@ -141,7 +142,50 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
     }
 
     fn face_at(&self, point: [f64; 3]) -> Face<Proj> {
-        todo!()
+        let proj = self.sphere_proj();
+        let (region, [u, v]) = proj.from_sphere_discrete(point);
+
+        // The above only gives us an approximation of which face contains the point. This is
+        // because the edges of a `TriSphere` are geodesics, but the boundaries of faces projected
+        // according to `proj` usually aren't. We need to find a spherical triangle, whose vertices
+        // are vertices of the `TriSphere`, that contains the point.
+        let mut v_0 = proj.to_sphere(region, [(u + 1) as f64, v as f64]);
+        let mut v_1 = proj.to_sphere(region, [u as f64, (v + 1) as f64]);
+        let mut edge_0 = HalfEdge {
+            sphere: self.clone(),
+            region,
+            start_u: (u + 1),
+            start_v: v,
+            dir: HalfEdgeDir::UnVp,
+        };
+        if mat::det_3([point, v_0, v_1]) < 0.0 {
+            std::mem::swap(&mut v_0, &mut v_1);
+            edge_0 = edge_0.complement();
+        };
+
+        // Iteratively check if the point is inside the triangle whose first side is `edge_0`.
+        // If not, traverse across the edge the point is outside of. Prevent infinite loops by
+        // limiting how many times each vertex can be involved in a check.
+        let mut limit = 0;
+        loop {
+            let v_2 = edge_0.prev();
+            let v_2 = proj.to_sphere(v_2.region, [v_2.start_u as f64, v_2.start_v as f64]);
+            if limit <= 1 && mat::det_3([point, v_1, v_2]) < 0.0 {
+                limit = limit.max(0);
+                limit += 1;
+                v_0 = v_2;
+                edge_0 = edge_0.next().complement();
+                continue;
+            }
+            if limit >= -1 && mat::det_3([point, v_2, v_0]) < 0.0 {
+                limit = limit.min(0);
+                limit -= 1;
+                v_1 = v_2;
+                edge_0 = edge_0.prev().complement();
+                continue;
+            }
+            return edge_0.inside();
+        }
     }
 
     fn num_vertices(&self) -> usize {
@@ -194,13 +238,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
     /// center of a face will be somewhere inside it. This is typically the fastest way to get a
     /// representative position on the face.
     pub fn center(&self) -> [f64; 3] {
-        self.sphere
-            .region_proj(self.region)
-            .to_sphere(if self.boundary_along_v {
+        self.sphere.sphere_proj().to_sphere(
+            self.region,
+            if self.boundary_along_v {
                 [self.u_0 as f64 - 1.0 / 3.0, self.v_0 as f64 + 2.0 / 3.0]
             } else {
                 [self.u_0 as f64 + 1.0 / 3.0, self.v_0 as f64 + 1.0 / 3.0]
-            })
+            },
+        )
     }
 }
 
@@ -209,7 +254,7 @@ fn test_center() {
     use crate::util::tri_area;
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Fuller,
+        crate::proj::Fuller,
         NonZero::new(4).unwrap(),
         1,
     );
@@ -244,10 +289,10 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Face for Face<Proj> {
 
     fn area(&self) -> f64 {
         let [[u_0, v_0], [u_1, v_1], [u_2, v_2]] = self.local_coords();
-        let eval = self.sphere.region_proj(self.region);
-        let p_0 = eval.to_sphere([u_0 as f64, v_0 as f64]);
-        let p_1 = eval.to_sphere([u_1 as f64, v_1 as f64]);
-        let p_2 = eval.to_sphere([u_2 as f64, v_2 as f64]);
+        let proj = self.sphere.sphere_proj();
+        let p_0 = proj.to_sphere(self.region, [u_0 as f64, v_0 as f64]);
+        let p_1 = proj.to_sphere(self.region, [u_1 as f64, v_1 as f64]);
+        let p_2 = proj.to_sphere(self.region, [u_2 as f64, v_2 as f64]);
         crate::util::tri_area([p_0, p_1, p_2])
     }
 
@@ -518,8 +563,8 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Vertex for Vertex<Proj> {
 
     fn pos(&self) -> [f64; 3] {
         self.sphere
-            .region_proj(self.region)
-            .to_sphere([self.u as f64, self.v as f64])
+            .sphere_proj()
+            .to_sphere(self.region, [self.u as f64, self.v as f64])
     }
 
     fn degree(&self) -> usize {
@@ -1251,9 +1296,27 @@ impl BaseTriSphere {
     }
 }
 
-impl<Proj: Eq + Clone + BaseTriProjector> TriSphere<Proj> {
-    /// Gets the [`RegionProjection`] for the given region.
-    fn region_proj(&self, region: BaseRegion) -> RegionProjection<impl proj::Projection> {
+/// A piecewise projection which maps local coordinates on a [`BaseRegion`] to points on the
+/// unit sphere, according to the parameters of a [`TriSphere`].
+struct SphereProjection<'a, Proj> {
+    /// The [`TriSphere`] this projection is based on.
+    sphere: &'a TriSphere<Proj>,
+
+    /// The local coordinates of the origin of an interior region on its corresponding base
+    /// face.
+    p_0: [f64; 2],
+
+    /// The linear transformation which maps local coordinates on a region to coordinates on
+    /// its corresponding base face.
+    linear: [[f64; 2]; 2],
+
+    /// The reciprocal of the determinant of `linear`.
+    inv_linear_det: f64,
+}
+
+impl<Proj> TriSphere<Proj> {
+    /// Constructs a [`SphereProjection`] based on the parameters of this [`TriSphere`].
+    fn sphere_proj(&self) -> SphereProjection<Proj> {
         let b = self.b() as f64;
         let c = self.c() as f64;
         let w_total = b * b + b * c + c * c;
@@ -1266,56 +1329,94 @@ impl<Proj: Eq + Clone + BaseTriProjector> TriSphere<Proj> {
         } else {
             [0.0, 1.0 / b]
         };
-        if region.ty().is_edge() {
-            let left = self
-                .proj()
-                .inside(region.as_edge())
-                .transform([0.0, 0.0], [u, v]);
-            let right = self
-                .proj()
-                .inside(region.as_edge().complement())
-                .transform([1.0, 0.0], [vec::neg(u), vec::neg(v)]);
-            RegionProjection::Edge {
-                left,
-                right,
-                c_over_b: c / b,
-            }
-        } else {
-            RegionProjection::Interior(
-                self.proj()
-                    .inside(region.owner().side(0))
-                    .transform(p_0, [u, v]),
-            )
+        let linear = [u, v];
+        SphereProjection {
+            sphere: self,
+            p_0,
+            linear,
+            inv_linear_det: 1.0 / mat::det_2(linear),
         }
     }
 }
 
-/// Maps local coordinates on a [`BaseRegion`] to world coordinates on the unit sphere.
-enum RegionProjection<Base> {
-    Interior(Base),
-    Edge {
-        left: Base,
-        right: Base,
-        c_over_b: f64,
-    },
-}
+impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
+    /// Projects a point in the local coordinates of a given region to a point on the unit sphere.
+    pub fn to_sphere(&self, region: BaseRegion, coords: [f64; 2]) -> [f64; 3] {
+        if region.ty().is_edge() {
+            let coords = mat::apply(self.linear, coords);
+            if coords[1] >= 0.0 {
+                self.sphere
+                    .proj()
+                    .inside(region.as_edge())
+                    .to_sphere(coords)
+            } else {
+                self.sphere
+                    .proj()
+                    .inside(region.as_edge().complement())
+                    .to_sphere(vec::add([1.0, 0.0], vec::neg(coords)))
+            }
+        } else {
+            self.sphere
+                .proj()
+                .inside(region.owner().side(0))
+                .to_sphere(vec::add(self.p_0, mat::apply(self.linear, coords)))
+        }
+    }
 
-impl<Base: proj::Projection> RegionProjection<Base> {
-    /// Projects a point in the local coordinate space of this region to a point on the sphere.
-    pub fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3] {
-        match self {
-            RegionProjection::Interior(proj) => proj.to_sphere(coords),
-            RegionProjection::Edge {
-                left,
-                right,
-                c_over_b,
-            } => {
-                if coords[0] * c_over_b <= coords[1] {
-                    left.to_sphere(coords)
+    /// Projects a point on the unit sphere to "discrete" local coordinates of some region.
+    #[expect(clippy::wrong_self_convention)]
+    pub fn from_sphere_discrete(&self, point: [f64; 3]) -> (BaseRegion, [u32; 2]) {
+        let face = self.sphere.base().face_at(point);
+        let coords = self.sphere.proj().inside(face.side(0)).from_sphere(point);
+        let b = self.sphere.b();
+        let c = self.sphere.c();
+        if c == 0 {
+            let [u, v] = vec::mul(coords, b as f64);
+            let u = (u.max(0.0) as u32).min(b - 1);
+            let v = (v.max(0.0) as u32).min(b - u - 1);
+            debug_assert!(u + v < b);
+            return (BaseRegion::new(face, BaseRegionType::Interior), [u, v]);
+        }
+        let coords = vec::sub(coords, self.p_0);
+        let coords = vec::mul(coords, self.inv_linear_det);
+        let [u, v] = mat::apply(mat::adjoint_2(self.linear), coords);
+        let n = b - c;
+        let (comp, [r_u, r_v]) = if u + v < n as f64 {
+            if u >= 0.0 {
+                let u = u as u32;
+                if v >= 0.0 {
+                    let v = v as u32;
+                    debug_assert!(u + v < n);
+                    return (BaseRegion::new(face, BaseRegionType::Interior), [u, v]);
                 } else {
-                    right.to_sphere(coords)
+                    debug_assert!(u < b);
+                    let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
+                    return (BaseRegion::new(face, BaseRegionType::Edge0), [u, r_v]);
+                }
+            } else {
+                let r_u = ((u + (v + c as f64)).max(0.0) as u32).min(b - 1);
+                let r_v = ((-u) as u32).min(c - 1);
+                if face.owns_edge_2() {
+                    return (BaseRegion::new(face, BaseRegionType::Edge2), [r_u, r_v]);
+                } else {
+                    (face.side(2).complement(), [r_u, r_v])
                 }
             }
+        } else if v >= 0.0 {
+            let r_u = ((b as f64 - v).max(0.0) as u32).min(b - 1);
+            let r_v = ((u - (n as f64 - v)) as u32).min(c - 1);
+            (face.side(1).complement(), [r_u, r_v])
+        } else {
+            let r_u = (u as u32).min(b - 1);
+            let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
+            return (BaseRegion::new(face, BaseRegionType::Edge0), [r_u, r_v]);
+        };
+        if comp.side_index() == 0 {
+            (BaseRegion::new(comp.inside(), BaseRegionType::Edge0), [r_u, r_v])
+        } else {
+            debug_assert_eq!(comp.side_index(), 2);
+            debug_assert!(comp.inside().owns_edge_2());
+            (BaseRegion::new(comp.inside(), BaseRegionType::Edge2), [b - r_u - 1, c - r_v - 1])
         }
     }
 }
