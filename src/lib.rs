@@ -41,6 +41,23 @@ pub fn octosphere() -> TriSphere<proj::Gnomonic> {
     )
 }
 
+/// Bundles the traits required to ergonomically work with tessellated spheres.
+/// 
+/// It is recommended to always import this module when using this crate, like so:
+/// 
+/// ```
+/// use subsphere::prelude::*;
+/// ```
+/// 
+/// The names of the bundled traits are hidden to prevent name collisions. If you need to actually
+/// refer to the traits, you must do so explicitly, e.g. [`subsphere::Sphere`](crate::Sphere).
+pub mod prelude {
+    pub use crate::Sphere as _;
+    pub use crate::Face as _;
+    pub use crate::Vertex as _;
+    pub use crate::HalfEdge as _;
+}
+
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
 /// 
 /// There are numerous requirements for a valid [`Sphere`] implementation. Custom implementations

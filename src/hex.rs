@@ -1,7 +1,5 @@
 //! Contains types related to [`HexSphere`].
-use crate::Face as FaceExt;
-use crate::HalfEdge as HalfEdgeExt;
-use crate::Vertex as VertexExt;
+use crate::prelude::*;
 use crate::proj::BaseTriProjector;
 use crate::tri::{self, BaseRegion, BaseRegionType, TriSphere};
 use std::num::NonZero;
@@ -163,7 +161,8 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
     }
 
     fn face(&self, index: usize) -> Face<Proj> {
-        todo!()
+        // TODO: "Real" implementation with constant-time performance
+        self.faces().nth(index).expect("face index out of bounds")
     }
 
     fn faces(&self) -> impl Iterator<Item = Face<Proj>> {
@@ -177,7 +176,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
     }
 
     fn face_at(&self, point: [f64; 3]) -> Face<Proj> {
-        todo!()
+        unsafe { Face::from_kis(self.kis.face_at(point)).unwrap_unchecked() }
     }
 
     fn num_vertices(&self) -> usize {
@@ -207,10 +206,62 @@ pub struct Face<Proj> {
 }
 
 impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
-    /// Constructs a [`Face`] from the given central vertex.
-    fn new(center: tri::Vertex<Proj>) -> Self {
-        debug_assert_eq!(center.u % 3, center.adjusted_v() % 3);
-        Self { center }
+    /// Gets the hexsphere face whose central vertex, in the [kised](HexSphere::kis) [`TriSphere`],
+    /// is the given [`Vertex`](tri::Vertex).
+    ///
+    /// This will return [`None`] if the given vertex does not correspond to a face on any
+    /// [`HexSphere`].
+    ///
+    /// # Examples
+    /// ```
+    /// # use subsphere::prelude::*;
+    /// let sphere = subsphere::icosphere().truncate();
+    /// let face = sphere.face(0);
+    /// let center = face.center();
+    /// assert_eq!(subsphere::hex::Face::from_center(center), Some(face));
+    /// ```
+    pub fn from_center(center: tri::Vertex<Proj>) -> Option<Self> {
+        if center.sphere.b() % 3 != center.sphere.c() % 3 {
+            return None;
+        }
+        if center.u % 3 != center.adjusted_v() % 3 {
+            return None;
+        }
+        Some(Self { center })
+    }
+
+    /// Gets the hexsphere face which, when [kised](HexSphere::kis), produces the given
+    /// triangular [`Face`](tri::Face).
+    ///
+    /// This will return [`None`] if there is no way to produce the given face by performing a
+    /// kis operation.
+    ///
+    /// # Examples
+    /// ```
+    /// # use subsphere::prelude::*;
+    /// let sphere = subsphere::icosphere().truncate();
+    /// let face = sphere.face(0);
+    /// let kis_face = face.side(0).kis().inside();
+    /// assert_eq!(subsphere::hex::Face::from_kis(kis_face), Some(face));
+    /// ```
+    pub fn from_kis(kis: tri::Face<Proj>) -> Option<Self> {
+        if kis.sphere.b() % 3 != kis.sphere.c() % 3 {
+            return None;
+        }
+        let adj_v = if !kis.region.ty().is_edge() {
+            kis.sphere.c()
+        } else {
+            0
+        };
+        let [u, v] = match ((kis.u_0 + 2 * (kis.v_0 + adj_v)) % 3, kis.boundary_along_v) {
+            (0, _) => [kis.u_0, kis.v_0],
+            (1, _) => [kis.u_0, kis.v_0 + 1],
+            (_, false) => [kis.u_0 + 1, kis.v_0],
+            (_, true) => [kis.u_0 - 1, kis.v_0 + 1],
+        };
+        Some(unsafe {
+            Self::from_center(tri::Vertex::new(kis.sphere, kis.region, u, v)).unwrap_unchecked()
+        })
     }
 
     /// The [`HexSphere`] that this [`Face`] belongs to.
@@ -218,6 +269,11 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
         HexSphere {
             kis: self.center.sphere.clone(),
         }
+    }
+
+    /// The central vertex of this face on the [kised](HexSphere::kis) [`TriSphere`].
+    pub fn center(self) -> tri::Vertex<Proj> {
+        self.center
     }
 
     /// Indicates whether this is a hexagonal face.
@@ -378,7 +434,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
     fn length(&self) -> f64 {
         self.kis.length()
     }
-    
+
     fn angle(&self) -> f64 {
         let v_a = self.prev().start().pos();
         let v_b = self.start().pos();
@@ -496,12 +552,15 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
     fn next(&mut self) -> Option<Face<Proj>> {
         loop {
             if self.u < self.u_end {
-                let res = Face::new(tri::Vertex {
-                    sphere: self.sphere.kis.clone(),
-                    region: self.region,
-                    u: self.u,
-                    v: self.v,
-                });
+                let res = unsafe {
+                    Face::from_center(tri::Vertex {
+                        sphere: self.sphere.kis.clone(),
+                        region: self.region,
+                        u: self.u,
+                        v: self.v,
+                    })
+                    .unwrap_unchecked()
+                };
                 self.u += 3;
                 return Some(res);
             } else if self.region.ty().is_edge() {
@@ -513,12 +572,15 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
                     && self.region.ty() == BaseRegionType::Edge0
                     && self.region.owner().owns_vertex_1()
                 {
-                    let res = Face::new(tri::Vertex {
-                        sphere: self.sphere.kis.clone(),
-                        region: self.region,
-                        u: self.u,
-                        v: self.v,
-                    });
+                    let res = unsafe {
+                        Face::from_center(tri::Vertex {
+                            sphere: self.sphere.kis.clone(),
+                            region: self.region,
+                            u: self.u,
+                            v: self.v,
+                        })
+                        .unwrap_unchecked()
+                    };
                     self.u += 3;
                     return Some(res);
                 }

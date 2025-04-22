@@ -1,8 +1,5 @@
 //! Contains types related to [`TriSphere`].
-use crate::Face as FaceExt;
-use crate::HalfEdge as HalfEdgeExt;
-use crate::Sphere as SphereExt;
-use crate::Vertex as VertexExt;
+use crate::prelude::*;
 use crate::basetri::BaseTriSphere;
 use crate::basetri::Face as BaseFace;
 use crate::basetri::HalfEdge as BaseHalfEdge;
@@ -213,22 +210,22 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
 /// This is always a geodesic triangle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Face<Proj> {
-    sphere: TriSphere<Proj>,
+    pub(crate) sphere: TriSphere<Proj>,
 
     /// The [`BaseRegion`] which "owns" this face.
-    region: BaseRegion,
+    pub(crate) region: BaseRegion,
 
     /// The U coordinate of the first vertex of this face, specified in the local coordinate space
     /// of `region`.
-    u_0: u32,
+    pub(crate) u_0: u32,
 
     /// The U coordinate of the first vertex of this face, specified in the local coordinate space
     /// of `region`.
-    v_0: u32,
+    pub(crate) v_0: u32,
 
     /// If `true`, the first [`HalfEdge`] boundary of this face will go in the +V direction.
     /// Otherwise, it will go in the +U direction.
-    boundary_along_v: bool,
+    pub(crate) boundary_along_v: bool,
 }
 
 impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
@@ -359,7 +356,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
     /// Constructs a [`Vertex`] with the given properties.
     ///
     /// This will normalize the vertex `region` to be its proper owner.
-    fn new(sphere: TriSphere<Proj>, region: BaseRegion, u: u32, v: u32) -> Self {
+    pub(crate) fn new(sphere: TriSphere<Proj>, region: BaseRegion, u: u32, v: u32) -> Self {
         if region.ty().is_edge() {
             if v == 0 {
                 Self::on_edge_u_boundary(sphere, region.as_edge(), u)
