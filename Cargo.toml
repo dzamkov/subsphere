@@ -9,3 +9,6 @@ license = "MIT OR Apache-2.0"
 keywords = ["gamedev", "math", "geometry", "sphere", "tessellation"]
 categories = ["mathematics", "data-structures", "graphics"]
 readme = "README.md"
+
+[workspace]
+members = ["render"]

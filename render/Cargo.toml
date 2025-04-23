@@ -1,0 +1,13 @@
+[package]
+name = "subsphere-render"
+version = "0.1.0"
+edition = "2024"
+authors = ["Dmitry Zamkov <dmitry94@gmail.com>"]
+repository = "https://github.com/dzamkov/subsphere"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+subsphere = { path = "../" }
+image = "0.25.6"
+palette = "0.7.6"
+rand = "0.9.1"

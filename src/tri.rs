@@ -130,7 +130,8 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
     }
 
     fn face(&self, index: usize) -> Face<Proj> {
-        todo!()
+        // TODO: "Real" implementation with constant-time performance
+        self.faces().nth(index).expect("face index out of bounds")
     }
 
     #[allow(refining_impl_trait)]
