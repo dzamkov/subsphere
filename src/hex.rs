@@ -33,7 +33,7 @@ impl<Proj> HexSphere<Proj> {
     ///
     /// For this to succeed, the [`TriSphere`] parameters must satisfy `b % 3 == c % 3`.
     /// This will return [`None`] otherwise.
-    pub fn new(kis: TriSphere<Proj>) -> Option<Self> {
+    pub fn from_kis(kis: TriSphere<Proj>) -> Option<Self> {
         if (kis.b() + 2 * kis.c()) % 3 == 0 {
             Some(Self { kis })
         } else {
@@ -45,7 +45,7 @@ impl<Proj> HexSphere<Proj> {
     /// [kis](https://en.wikipedia.org/wiki/Conway_polyhedron_notation#Original_operations)
     /// operation on this [`HexSphere`].
     ///
-    /// This creates a [`Face`](crate::Face) for each [`HalfEdge`] in the [`TriSphere`].
+    /// This creates a [`Face`](crate::Face) for each [`HalfEdge`] in the [`HexSphere`].
     pub fn kis(self) -> TriSphere<Proj> {
         self.kis
     }

@@ -92,7 +92,7 @@ fn test_icosphere_2_2() {
 
 #[test]
 fn test_hexsphere_6_0() {
-    let sphere = HexSphere::new(TriSphere::new(
+    let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
         NonZero::new(6).unwrap(),
@@ -104,7 +104,7 @@ fn test_hexsphere_6_0() {
 
 #[test]
 fn test_hexsphere_4_1() {
-    let sphere = HexSphere::new(TriSphere::new(
+    let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
         NonZero::new(4).unwrap(),
@@ -116,7 +116,7 @@ fn test_hexsphere_4_1() {
 
 #[test]
 fn test_hexsphere_7_1() {
-    let sphere = HexSphere::new(TriSphere::new(
+    let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
         NonZero::new(7).unwrap(),
@@ -128,7 +128,7 @@ fn test_hexsphere_7_1() {
 
 #[test]
 fn test_hexsphere_2_2() {
-    let sphere = HexSphere::new(TriSphere::new(
+    let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
         NonZero::new(2).unwrap(),
@@ -140,7 +140,7 @@ fn test_hexsphere_2_2() {
 
 #[test]
 fn test_hexsphere_8_2() {
-    let sphere = HexSphere::new(TriSphere::new(
+    let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
         NonZero::new(8).unwrap(),
@@ -152,7 +152,7 @@ fn test_hexsphere_8_2() {
 
 #[test]
 fn test_hexsphere_3_3() {
-    let sphere = HexSphere::new(TriSphere::new(
+    let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
         NonZero::new(3).unwrap(),

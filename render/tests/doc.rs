@@ -24,7 +24,7 @@ fn test_trisphere_icosa_3_1_fuller() {
 
 #[test]
 fn test_hexsphere_icosa_8_2_gnomonic() {
-    let sphere = subsphere::HexSphere::new(subsphere::TriSphere::new(
+    let sphere = subsphere::HexSphere::from_kis(subsphere::TriSphere::new(
         subsphere::BaseTriSphere::Icosa,
         subsphere::proj::Gnomonic,
         std::num::NonZero::new(8).unwrap(),
@@ -36,7 +36,7 @@ fn test_hexsphere_icosa_8_2_gnomonic() {
 
 #[test]
 fn test_hexsphere_icosa_8_2_fuller() {
-    let sphere = subsphere::HexSphere::new(subsphere::TriSphere::new(
+    let sphere = subsphere::HexSphere::from_kis(subsphere::TriSphere::new(
         subsphere::BaseTriSphere::Icosa,
         subsphere::proj::Fuller,
         std::num::NonZero::new(8).unwrap(),
