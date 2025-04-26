@@ -26,15 +26,9 @@ and projections to tune the tessellation to your needs.
 sphere. All objects follow the contours of the sphere, and all calculations correctly account for
 this.
 
-## Usage
+## Examples
 
-### Constructing a tessellation
-
-The first step to using `subsphere` is to specify which tessellation you are working with.
-Tessellations implement the [`Sphere`](https://docs.rs/subsphere/latest/subsphere/trait.Sphere.html)
-trait. There's two main ways to construct a tessellation:
-
-**Refining a base tessellation**
+#### Construct a tessellation by refining a base tessellation
 
 ```rust
 let sphere = subsphere::icosphere()
@@ -43,7 +37,7 @@ let sphere = subsphere::icosphere()
     .truncate();
 ```
 
-**Explicitly**
+#### Construct a tessellation explicitly
 
 ```rust
 let sphere = subsphere::HexSphere::from_kis(
@@ -56,5 +50,34 @@ let sphere = subsphere::HexSphere::from_kis(
 ).unwrap();
 ```
 
-These examples both yield the same hexagonal tessellation. Note that there are currently some
-tessellations which can only be constructed explicitly.
+#### Write a tessellation to an [OBJ file](https://en.wikipedia.org/wiki/Wavefront_.obj_file)
+
+```rust
+let mut obj = String::new();
+for vert in sphere.vertices() {
+    let pos = vert.pos();
+    obj.push_str(&format!("v {} {} {}\n", pos[0], pos[1], pos[2]));
+}
+for face in sphere.faces() {
+    let indices = face
+        .vertices()
+        .map(|vert| format!("{}", vert.index() + 1)) // OBJ indices are 1-based
+        .collect::<Vec<_>>();
+    obj.push_str(&format!("f {}\n", indices.join(" ")));
+}
+std::fs::write("sphere.obj", &obj).expect("failed to write to file");
+```
+
+#### Toggle neighboring faces when a face is clicked
+
+```rust
+// Setup
+let mut is_active = vec![false; sphere.num_faces()];
+
+// For each click
+let click_face = sphere.face_at(click_point);
+for side in click_face.sides() {
+    let neighbor_index = side.complement().inside().index();
+    is_active[neighbor_index] = !is_active[neighbor_index];
+}
+```
