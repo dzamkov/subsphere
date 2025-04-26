@@ -12,6 +12,17 @@ fn test_trisphere_icosa_3_1_gnomonic() {
 }
 
 #[test]
+fn test_trisphere_icosa_3_1_fuller() {
+    let sphere = subsphere::TriSphere::new(
+        subsphere::BaseTriSphere::Icosa,
+        subsphere::proj::Fuller,
+        std::num::NonZero::new(3).unwrap(),
+        1,
+    );
+    render(&sphere, "trisphere_icosa_3_1_fuller");
+}
+
+#[test]
 fn test_hexsphere_icosa_8_2_gnomonic() {
     let sphere = subsphere::HexSphere::new(subsphere::TriSphere::new(
         subsphere::BaseTriSphere::Icosa,
@@ -21,6 +32,18 @@ fn test_hexsphere_icosa_8_2_gnomonic() {
     ))
     .unwrap();
     render(&sphere, "hexsphere_icosa_8_2_gnomonic");
+}
+
+#[test]
+fn test_hexsphere_icosa_8_2_fuller() {
+    let sphere = subsphere::HexSphere::new(subsphere::TriSphere::new(
+        subsphere::BaseTriSphere::Icosa,
+        subsphere::proj::Fuller,
+        std::num::NonZero::new(8).unwrap(),
+        2,
+    ))
+    .unwrap();
+    render(&sphere, "hexsphere_icosa_8_2_fuller");
 }
 
 /// Renders the given sphere with the given name.

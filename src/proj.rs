@@ -11,19 +11,19 @@ pub use gnomonic::Gnomonic;
 pub use tri::{BaseTriProjector, TriProjector};
 
 /// Maps two-dimensional "local" coordinates to points on the unit sphere.
-/// 
+///
 /// The domain and range of the projection function may be restricted, e.g. local coordinates
 /// may be restricted to a triangle or rectangle, and only a small section of the unit sphere
 /// may be covered.
 pub trait Projection {
     /// Projects a point in the local coordinates to a point on the unit sphere.
-    /// 
+    ///
     /// This is the inverse of [`from_sphere`](Projection::from_sphere). If the given local
     /// coordinates are not in the domain of the projection, the result is undefined.
     fn to_sphere(&self, coords: [f64; 2]) -> [f64; 3];
 
     /// Projects a point on the unit sphere to a point in the local coordinates.
-    /// 
+    ///
     /// This is the inverse of [`to_sphere`](Projection::to_sphere). If the given point is not in
     /// the range of the projection, the result is undefined.
     #[expect(clippy::wrong_self_convention)]
@@ -89,7 +89,7 @@ pub mod tri {
         /// The points must be on the unit sphere, in counter-clockwise order, and strictly
         /// contained in one hemisphere. The edges of the triangle are geodesics. The length
         /// of each edge in the local coordinate space is assumed to be `1`.
-        /// 
+        ///
         /// The local coordinates are defined like so:
         /// ```text
         ///           p₂
@@ -116,7 +116,7 @@ pub mod tri {
         /// of the given edge, oriented such that the U axis goes along the edge.
         ///
         /// The length of each edge in the local coordinate space is assumed to be `1`.
-        /// 
+        ///
         /// The local coordinates are defined like so:
         /// ```text
         ///         [0, 1]
@@ -182,7 +182,7 @@ pub mod gnomonic {
         offset: [f64; 3],
 
         /// A vector which is both normal to the plane and on the plane.
-        /// 
+        ///
         /// It follows that every vector `p` which is on the plane satisfies `dot(normal, p) = 1`.
         normal: [f64; 3],
 
@@ -195,12 +195,12 @@ pub mod gnomonic {
         v: [f64; 3],
 
         /// The inverse of the matrix:
-        /// 
+        ///
         /// ```text
         /// [dot(u, u), dot(u, v)]
         /// [dot(u, v), dot(v, v)]
         /// ```
-        /// 
+        ///
         /// Used for implementing [`Projection::from_sphere`].
         inv_linear: [[f64; 2]; 2],
     }
@@ -312,6 +312,7 @@ pub mod fuller {
 
             // Adapted from "Exact Equations for Fuller’s Map Projection and Inverse"
             // https://utppublishing.com/doi/pdf/10.3138/carto.43.1.67
+            // "Inverse with Spherical Linear Interpolation"
 
             // First, solve the equation:
             // `tan(x + proj_u) + tan(x) + tan(x + proj_v) + t_alpha = 0`
@@ -381,12 +382,47 @@ pub mod fuller {
         }
 
         fn from_sphere(&self, point: [f64; 3]) -> [f64; 2] {
-            todo!()
+            // Adapted from "Exact Equations for Fuller’s Map Projection and Inverse"
+            // https://utppublishing.com/doi/pdf/10.3138/carto.43.1.67
+            // "Transformation Equations with Spherical Linear Interpolation"
+
+            let d_0 = mat::det_3([point, self.points[0], self.points[1]]);
+            let d_1 = mat::det_3([point, self.points[1], self.points[2]]);
+            let d_2 = mat::det_3([point, self.points[2], self.points[0]]);
+            let c = vec::dot(self.points[0], self.points[1]);
+            let a_0 = (2.0 * (d_0 * c) / (d_0 * c + d_1 + d_2)).atan();
+            let a_1 = (2.0 * (d_1 * c) / (d_1 * c + d_2 + d_0)).atan();
+            let a_2 = (2.0 * (d_2 * c) / (d_2 * c + d_0 + d_1)).atan();
+            let u = (self.angle + 2.0 * a_2 - a_0 - a_1) / (3.0 * self.angle);
+            let v = (self.angle + 2.0 * a_0 - a_1 - a_2) / (3.0 * self.angle);
+            [u, v]
         }
 
         type Transform = Transform<Self>;
         fn transform(self, offset: [f64; 2], linear: [[f64; 2]; 2]) -> Transform<Self> {
             Transform::new(self, offset, linear)
+        }
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        use crate::basetri::BaseTriSphere;
+        use crate::prelude::*;
+        const N: usize = 100;
+        for v in 0..N {
+            for u in 0..(N - v) {
+                let u = u as f64 / N as f64;
+                let v = v as f64 / N as f64;
+                let proj = Fuller.inside(BaseTriSphere::Icosa.face(0).side(0));
+                let point = proj.to_sphere([u, v]);
+                let [a_u, a_v] = proj.from_sphere(point);
+                assert!(
+                    (a_u - u).abs() < 1e-12 && (a_v - v).abs() < 1e-12,
+                    "failed roundtrip: got {:?}, expected {:?}",
+                    [a_u, a_v],
+                    [u, v]
+                );
+            }
         }
     }
 }
