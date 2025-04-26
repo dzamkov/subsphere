@@ -1,6 +1,6 @@
 [package]
 name = "subsphere"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 authors = ["Dmitry Zamkov <dmitry94@gmail.com>"]
 description = "Sphere tessellation toolkit"
