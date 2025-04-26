@@ -4,8 +4,7 @@ use subsphere::{BaseTriSphere, Face, HalfEdge, HexSphere, Sphere, TriSphere, Ver
 
 #[test]
 fn test_octosphere_base() {
-    let sphere = TriSphere::from(BaseTriSphere::Octo);
-    assert_eq!(sphere, subsphere::octosphere());
+    let sphere = subsphere::octosphere();
     validate_tri(sphere);
     validate(sphere);
 }
@@ -17,6 +16,12 @@ fn test_octosphere_4_0() {
         proj::Gnomonic,
         NonZero::new(4).unwrap(),
         0,
+    );
+    assert_eq!(
+        sphere,
+        subsphere::octosphere()
+            .subdivide_edge(NonZero::new(4).unwrap())
+            .with_projector(proj::Gnomonic)
     );
     validate_tri(sphere);
     validate(sphere);
@@ -99,6 +104,13 @@ fn test_hexsphere_6_0() {
         0,
     ))
     .unwrap();
+    assert_eq!(
+        sphere,
+        subsphere::icosphere()
+            .subdivide_edge(NonZero::new(2).unwrap())
+            .with_projector(proj::Gnomonic)
+            .truncate()
+    );
     validate(sphere);
 }
 

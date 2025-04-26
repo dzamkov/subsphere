@@ -1,6 +1,6 @@
 //! Contains types related to [`HexSphere`].
 use crate::prelude::*;
-use crate::proj::BaseTriProjector;
+use crate::proj::{self, BaseTriProjector};
 use crate::tri::{self, BaseRegion, BaseRegionType, TriSphere};
 use std::num::NonZero;
 
@@ -11,7 +11,7 @@ use std::num::NonZero;
 /// [Goldberg polyhedron](https://en.wikipedia.org/wiki/Goldberg_polyhedron) onto
 /// the sphere.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct HexSphere<Proj> {
+pub struct HexSphere<Proj = proj::Default> {
     kis: TriSphere<Proj>,
 }
 
@@ -48,6 +48,16 @@ impl<Proj> HexSphere<Proj> {
     /// This creates a [`Face`](crate::Face) for each [`HalfEdge`] in the [`HexSphere`].
     pub fn kis(self) -> TriSphere<Proj> {
         self.kis
+    }
+
+    /// Replaces the projector of this sphere with the given one.
+    /// 
+    /// The resulting sphere will be topologically identical to this one, but the positions
+    /// of the vertices will be changed according to the new projection.
+    pub fn with_projector<NProj>(self, proj: NProj) -> HexSphere<NProj> {
+        HexSphere {
+            kis: self.kis.with_projector(proj),
+        }
     }
 
     /// [`TriSphere::num_divisions`] for the dual of this [`HexSphere`].

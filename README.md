@@ -25,3 +25,36 @@ and projections to tune the tessellation to your needs.
 * **Spherical Geometry:** In the world of `subsphere`, there is only one geometric space: the
 sphere. All objects follow the contours of the sphere, and all calculations correctly account for
 this.
+
+## Usage
+
+### Constructing a tessellation
+
+The first step to using `subsphere` is to specify which tessellation you are working with.
+Tessellations implement the [`Sphere`](https://docs.rs/subsphere/latest/subsphere/trait.Sphere.html)
+trait. There's two main ways to construct a tessellation:
+
+**Refining a base tessellation**
+
+```rust
+let sphere = subsphere::icosphere()
+    .subdivide_edge(NonZero::new(3).unwrap())
+    .with_projector(subsphere::proj::Fuller)
+    .truncate();
+```
+
+**Explicitly**
+
+```rust
+let sphere = subsphere::HexSphere::from_kis(
+    subsphere::TriSphere::new(
+        subsphere::BaseTriSphere::Icosa,
+        subsphere::proj::Fuller,
+        NonZero::new(9).unwrap(),
+        0,
+    )
+).unwrap();
+```
+
+These examples both yield the same hexagonal tessellation. Note that there are currently some
+tessellations which can only be constructed explicitly.

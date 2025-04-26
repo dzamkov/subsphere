@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 mod math;
@@ -19,10 +19,10 @@ use std::num::NonZero;
 ///
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
-pub fn icosphere() -> TriSphere<proj::Gnomonic> {
+pub fn icosphere() -> TriSphere {
     TriSphere::new(
         BaseTriSphere::Icosa,
-        proj::Gnomonic,
+        Default::default(),
         NonZero::new(1).unwrap(),
         0,
     )
@@ -32,34 +32,34 @@ pub fn icosphere() -> TriSphere<proj::Gnomonic> {
 ///
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
-pub fn octosphere() -> TriSphere<proj::Gnomonic> {
+pub fn octosphere() -> TriSphere {
     TriSphere::new(
         BaseTriSphere::Octo,
-        proj::Gnomonic,
+        Default::default(),
         NonZero::new(1).unwrap(),
         0,
     )
 }
 
 /// Bundles the traits required to ergonomically work with tessellated spheres.
-/// 
+///
 /// It is recommended to always import this module when using this crate, like so:
-/// 
+///
 /// ```
 /// use subsphere::prelude::*;
 /// ```
-/// 
+///
 /// The names of the bundled traits are hidden to prevent name collisions. If you need to actually
 /// refer to the traits, you must do so explicitly, e.g. [`subsphere::Sphere`](crate::Sphere).
 pub mod prelude {
-    pub use crate::Sphere as _;
     pub use crate::Face as _;
-    pub use crate::Vertex as _;
     pub use crate::HalfEdge as _;
+    pub use crate::Sphere as _;
+    pub use crate::Vertex as _;
 }
 
 /// Partitions the surface of the unit sphere into a set of spherical polygons ([`Face`]s).
-/// 
+///
 /// There are numerous requirements for a valid [`Sphere`] implementation. Custom implementations
 /// may use [`util::validate`] to check that these requirements are met.
 pub trait Sphere {
@@ -82,7 +82,7 @@ pub trait Sphere {
     fn faces(&self) -> impl Iterator<Item = Self::Face>;
 
     /// Determines which face contains the given point on the unit sphere.
-    /// 
+    ///
     /// If the point is between faces (i.e. on a vertex or edge), one of the faces that contains
     /// it inclusively will be returned.
     fn face_at(&self, point: [f64; 3]) -> Self::Face;
@@ -114,7 +114,7 @@ pub trait Face: Clone + Eq {
     ///
     /// This is also known as the [solid angle](https://en.wikipedia.org/wiki/Solid_angle)
     /// subtended by the face. The sum of the areas of all faces on a sphere is `4 π`.
-    /// 
+    ///
     /// For faces whose edges are all geodesics, this is equivalent to the [`util::poly_area`]
     /// of the vertices of the face.
     fn area(&self) -> f64;
@@ -162,7 +162,7 @@ pub trait Vertex: Clone + Eq {
     fn index(&self) -> usize;
 
     /// The position of this vertex.
-    /// 
+    ///
     /// This is guaranteed to be a unit-length vector.
     fn pos(&self) -> [f64; 3];
 
@@ -215,16 +215,16 @@ pub trait HalfEdge: Clone + Eq {
     }
 
     /// The length of the edge.
-    /// 
+    ///
     /// For edges that are geodesics, this is equivalent to the [`util::dist`] between its
     /// endpoints.
     fn length(&self) -> f64;
 
     /// The interior angle between the [previous half-edge](HalfEdge::prev) and this half-edge.
-    /// 
+    ///
     /// The sum of the angles of all [outgoing](Vertex::outgoings) half-edges at a vertex should
     /// be `2 π`.
-    /// 
+    ///
     /// If both this edge, and the previous edge, are geodesics, the angle is equivalent to
     /// [`util::angle`] where the `b` vertex is given by `self.start()`.
     fn angle(&self) -> f64;

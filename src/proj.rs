@@ -8,7 +8,7 @@ use crate::tri::TriSphere;
 
 pub use fuller::Fuller;
 pub use gnomonic::Gnomonic;
-pub use tri::{BaseTriProjector, TriProjector};
+pub use tri::{BaseTriProjector, TriProjector, Default};
 
 /// Maps two-dimensional "local" coordinates to points on the unit sphere.
 ///
@@ -130,6 +130,13 @@ pub mod tri {
         /// ```
         fn inside(&self, edge: basetri::HalfEdge) -> Self::Triangle;
     }
+
+    /// The default [`BaseTriProjector`] used when a projector is not explicitly specified.
+    /// 
+    /// Ideally, this would be defined as an
+    /// [impl Trait](https://github.com/rust-lang/rust/issues/63063), but that is not yet supported
+    /// in stable Rust.
+    pub type Default = Gnomonic;
 }
 
 /// Contains types related to the [`Gnomonic`] projection.

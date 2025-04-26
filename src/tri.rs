@@ -1,11 +1,11 @@
 //! Contains types related to [`TriSphere`].
-use crate::prelude::*;
 use crate::basetri::BaseTriSphere;
 use crate::basetri::Face as BaseFace;
 use crate::basetri::HalfEdge as BaseHalfEdge;
 use crate::basetri::Vertex as BaseVertex;
 use crate::math::{mat, vec};
-use crate::proj::{BaseTriProjector, Projection};
+use crate::prelude::*;
+use crate::proj::{self, BaseTriProjector, Projection};
 use std::num::NonZero;
 
 /// A tessellation of the unit sphere into triangular [`Face`]s constructed by subdividing a
@@ -14,7 +14,7 @@ use std::num::NonZero;
 /// This subdivision of a platonic solid is also known as a
 /// [geodesic polyhedron](https://en.wikipedia.org/wiki/Geodesic_polyhedron).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TriSphere<Proj> {
+pub struct TriSphere<Proj = proj::Default> {
     proj: Proj,
     b: NonZero<u32>,
     c_base: u32,
@@ -42,13 +42,25 @@ impl<Proj> TriSphere<Proj> {
         }
     }
 
+    /// Replaces the projector of this sphere with the given one.
+    ///
+    /// The resulting sphere will be topologically identical to this one, but the positions
+    /// of the vertices will be changed according to the new projection.
+    pub fn with_projector<NProj>(self, proj: NProj) -> TriSphere<NProj> {
+        TriSphere {
+            proj,
+            b: self.b,
+            c_base: self.c_base,
+        }
+    }
+
     /// The base shape of this subdivided sphere.
     pub const fn base(&self) -> BaseTriSphere {
         unsafe { std::mem::transmute((self.c_base & 0b11) as u8) }
     }
 
     /// The [`BaseTriProjector`] for this sphere.
-    pub const fn proj(&self) -> &Proj {
+    pub const fn projector(&self) -> &Proj {
         &self.proj
     }
 
@@ -1344,18 +1356,18 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
             let coords = mat::apply(self.linear, coords);
             if coords[1] >= 0.0 {
                 self.sphere
-                    .proj()
+                    .projector()
                     .inside(region.as_edge())
                     .to_sphere(coords)
             } else {
                 self.sphere
-                    .proj()
+                    .projector()
                     .inside(region.as_edge().complement())
                     .to_sphere(vec::add([1.0, 0.0], vec::neg(coords)))
             }
         } else {
             self.sphere
-                .proj()
+                .projector()
                 .inside(region.owner().side(0))
                 .to_sphere(vec::add(self.p_0, mat::apply(self.linear, coords)))
         }
@@ -1365,7 +1377,11 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
     #[expect(clippy::wrong_self_convention)]
     pub fn from_sphere_discrete(&self, point: [f64; 3]) -> (BaseRegion, [u32; 2]) {
         let face = self.sphere.base().face_at(point);
-        let coords = self.sphere.proj().inside(face.side(0)).from_sphere(point);
+        let coords = self
+            .sphere
+            .projector()
+            .inside(face.side(0))
+            .from_sphere(point);
         let b = self.sphere.b();
         let c = self.sphere.c();
         if c == 0 {
@@ -1410,11 +1426,17 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
             return (BaseRegion::new(face, BaseRegionType::Edge0), [r_u, r_v]);
         };
         if comp.side_index() == 0 {
-            (BaseRegion::new(comp.inside(), BaseRegionType::Edge0), [r_u, r_v])
+            (
+                BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
+                [r_u, r_v],
+            )
         } else {
             debug_assert_eq!(comp.side_index(), 2);
             debug_assert!(comp.inside().owns_edge_2());
-            (BaseRegion::new(comp.inside(), BaseRegionType::Edge2), [b - r_u - 1, c - r_v - 1])
+            (
+                BaseRegion::new(comp.inside(), BaseRegionType::Edge2),
+                [b - r_u - 1, c - r_v - 1],
+            )
         }
     }
 }
