@@ -3,11 +3,14 @@ name = "subsphere-render"
 version = "0.1.0"
 edition = "2024"
 authors = ["Dmitry Zamkov <dmitry94@gmail.com>"]
+description = "Rendering tool for the subsphere crate"
 repository = "https://github.com/dzamkov/subsphere"
+keywords = ["gamedev", "math", "geometry", "sphere", "tessellation"]
+categories = ["mathematics", "data-structures", "graphics"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-subsphere = { path = "../" }
+subsphere = { path = "../", version = "0.5.2" }
 image = "0.25.6"
 palette = "0.7.6"
 rand = "0.9.1"
