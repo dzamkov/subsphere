@@ -284,8 +284,8 @@ impl HalfEdge {
     /// Gets the complementary half-edge on the opposite side of the edge.
     ///
     /// The returned half-edge will go in the opposite direction along the same edge.
-    pub const fn complement(self) -> Self {
-        COMPLEMENT[self.inside().0 as usize][self.side_index()]
+    pub const fn twin(self) -> Self {
+        TWIN[self.inside().0 as usize][self.side_index()]
     }
 
     /// Gets the half-edge which shares the [`inside`](HalfEdge::inside) face of this half-edge and
@@ -337,8 +337,8 @@ impl crate::HalfEdge for HalfEdge {
         (*self).start()
     }
 
-    fn complement(&self) -> Self {
-        (*self).complement()
+    fn twin(&self) -> Self {
+        (*self).twin()
     }
 
     fn prev(&self) -> Self {
@@ -379,7 +379,7 @@ static OUTGOING: [[HalfEdge; 5]; NUM_VERTS] = const {
         loop {
             res[j][k] = outgoing;
             k += 1;
-            outgoing = outgoing.prev().complement();
+            outgoing = outgoing.prev().twin();
             assert!(
                 outgoing.start().0 == vert.0,
                 "outgoing edge does not start at vertex"
@@ -487,8 +487,8 @@ static OWNERSHIP: OwnershipInfo = const {
     }
 };
 
-/// Table used to implement [`crate::HalfEdge::complement`].
-static COMPLEMENT: [[HalfEdge; 3]; NUM_FACES] = const {
+/// Table used to implement [`crate::HalfEdge::twin`].
+static TWIN: [[HalfEdge; 3]; NUM_FACES] = const {
     // Build adjacent mapping for potential edges
     let mut adjacent: [[u8; NUM_VERTS]; NUM_VERTS] = [[u8::MAX; NUM_VERTS]; NUM_VERTS];
     let mut i = 0;

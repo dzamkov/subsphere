@@ -137,7 +137,7 @@ pub fn colorize(sphere: &impl subsphere::Sphere) -> Box<[Color]> {
             let index = face.index();
             let mut available_colors = (1u64 << num_colors) - 1;
             for side in face.sides() {
-                let neighbor = side.complement().inside();
+                let neighbor = side.twin().inside();
                 if let Some(color) = face_colors[neighbor.index()] {
                     available_colors &= !(1 << color);
                 }

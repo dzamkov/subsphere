@@ -77,7 +77,7 @@ let mut is_active = vec![false; sphere.num_faces()];
 // For each click
 let click_face = sphere.face_at(click_point);
 for side in click_face.sides() {
-    let neighbor_index = side.complement().inside().index();
+    let neighbor_index = side.twin().inside().index();
     is_active[neighbor_index] = !is_active[neighbor_index];
 }
 ```

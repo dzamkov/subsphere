@@ -193,8 +193,9 @@ pub trait Vertex: Clone + Eq {
 
 /// Represents one "side" or direction of an edge on a [`Sphere`].
 ///
-/// Half-edges are oriented such that they go counter-clockwise around their
-/// [`inside`](HalfEdge::inside) face.
+/// [Half-edge data structures](https://jerryyin.info/geometry-processing-algorithms/half-edge/)
+/// are used to conveniently represent the topology of a sphere and traverse between different
+/// elements.
 pub trait HalfEdge: Clone + Eq {
     /// The type of [`Face`] on the sphere.
     type Face: Face<Vertex = Self::Vertex, HalfEdge = Self>;
@@ -237,8 +238,10 @@ pub trait HalfEdge: Clone + Eq {
 
     /// Gets the complementary half-edge on the opposite side of the edge.
     ///
-    /// The returned half-edge will go in the opposite direction along the same edge.
-    fn complement(&self) -> Self;
+    /// The returned half-edge will go in the opposite direction along the same edge. It will have
+    /// the opposite [`start`](HalfEdge::start) and [`inside`](HalfEdge::inside). This method is
+    /// its own inverse, i.e. for all half-edges `e`, `e.twin().twin() == e`.
+    fn twin(&self) -> Self;
 
     /// Gets the half-edge which shares the [`inside`](HalfEdge::inside) face of this half-edge and
     /// precedes it in counter-clockwise order around the face.

@@ -170,7 +170,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
         };
         if mat::det_3([point, v_0, v_1]) < 0.0 {
             std::mem::swap(&mut v_0, &mut v_1);
-            edge_0 = edge_0.complement();
+            edge_0 = edge_0.twin();
         };
 
         // Iteratively check if the point is inside the triangle whose first side is `edge_0`.
@@ -184,14 +184,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
                 limit = limit.max(0);
                 limit += 1;
                 v_0 = v_2;
-                edge_0 = edge_0.next().complement();
+                edge_0 = edge_0.next().twin();
                 continue;
             }
             if limit >= -1 && mat::det_3([point, v_2, v_0]) < 0.0 {
                 limit = limit.min(0);
                 limit -= 1;
                 v_1 = v_2;
-                edge_0 = edge_0.prev().complement();
+                edge_0 = edge_0.prev().twin();
                 continue;
             }
             return edge_0.inside();
@@ -378,11 +378,11 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
             } else if v >= sphere.c() {
                 debug_assert_eq!(v, sphere.c());
                 let u = sphere.b() - u;
-                Self::on_edge_u_boundary(sphere, region.as_edge().complement(), u)
+                Self::on_edge_u_boundary(sphere, region.as_edge().twin(), u)
             } else if u >= sphere.b() {
                 debug_assert_eq!(u, sphere.b());
                 let v = sphere.c() - v;
-                Self::on_edge_v_boundary(sphere, region.as_edge().complement(), v)
+                Self::on_edge_v_boundary(sphere, region.as_edge().twin(), v)
             } else {
                 Self {
                     sphere,
@@ -414,12 +414,12 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
     /// Constructs a [`Vertex`] on the bottom (V = 0) boundary of an interior region.
     fn on_interior_boundary(sphere: TriSphere<Proj>, bottom: BaseHalfEdge, u: u32) -> Self {
         let u = sphere.b() - u;
-        Self::on_edge_u_boundary(sphere, bottom.complement(), u)
+        Self::on_edge_u_boundary(sphere, bottom.twin(), u)
     }
 
     /// Constructs a [`Vertex`] on the V (U = 0) boundary of an edge region.
     fn on_edge_v_boundary(sphere: TriSphere<Proj>, edge: BaseHalfEdge, v: u32) -> Self {
-        Self::on_edge_u_boundary(sphere, edge.prev().complement(), v)
+        Self::on_edge_u_boundary(sphere, edge.prev().twin(), v)
     }
 
     /// Constructs a [`Vertex`] on the U (V = 0) boundary of an edge region.
@@ -428,10 +428,10 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
             // In the special case where `b == c`, it's the interior region which owns the
             // central vertex.
             if sphere.b() == sphere.c() {
-                Self::center(sphere, edge.complement().inside())
+                Self::center(sphere, edge.twin().inside())
             } else {
                 let u = sphere.c();
-                Self::on_edge_u_boundary_exclusive(sphere, edge.complement().prev().complement(), u)
+                Self::on_edge_u_boundary_exclusive(sphere, edge.twin().prev().twin(), u)
             }
         } else {
             Self::on_edge_u_boundary_exclusive(sphere, edge, u)
@@ -453,7 +453,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                         v: 0,
                     };
                 }
-                1 => edge.complement(),
+                1 => edge.twin(),
                 _ => {
                     if edge.inside().owns_edge_2() {
                         let u = sphere.b() - u;
@@ -465,7 +465,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                             v,
                         };
                     } else {
-                        edge.complement()
+                        edge.twin()
                     }
                 }
             };
@@ -663,7 +663,7 @@ impl<Proj> HalfEdge<Proj> {
                 let start_u = sphere.b() - start_u;
                 Self::on_edge_u_boundary(
                     sphere,
-                    region.as_edge().complement(),
+                    region.as_edge().twin(),
                     start_u,
                     dir.rotate_ccw(3),
                 )
@@ -672,7 +672,7 @@ impl<Proj> HalfEdge<Proj> {
                 let start_v = sphere.c() - start_v;
                 Self::on_edge_v_boundary(
                     sphere,
-                    region.as_edge().complement(),
+                    region.as_edge().twin(),
                     start_v,
                     dir.rotate_ccw(3),
                 )
@@ -728,7 +728,7 @@ impl<Proj> HalfEdge<Proj> {
             if dir > HalfEdgeDir::Up {
                 return Self::on_edge_u_boundary(
                     sphere,
-                    bottom.prev().complement(),
+                    bottom.prev().twin(),
                     c + start_u,
                     dir.rotate_ccw(5),
                 );
@@ -743,12 +743,7 @@ impl<Proj> HalfEdge<Proj> {
         };
         if !in_region {
             let start_u = sphere.b() - start_u;
-            return Self::on_edge_u_boundary(
-                sphere,
-                bottom.complement(),
-                start_u,
-                dir.rotate_ccw(3),
-            );
+            return Self::on_edge_u_boundary(sphere, bottom.twin(), start_u, dir.rotate_ccw(3));
         }
         let (start_u, start_v, dir) = match bottom.side_index() {
             0 => (start_u, 0, dir),
@@ -782,7 +777,7 @@ impl<Proj> HalfEdge<Proj> {
         } else if dir == HalfEdgeDir::Up {
             Self::on_edge_exclusive(sphere, edge, 0, start_v, dir)
         } else {
-            Self::on_edge_u_boundary(sphere, edge.prev().complement(), start_v, dir.rotate_ccw(5))
+            Self::on_edge_u_boundary(sphere, edge.prev().twin(), start_v, dir.rotate_ccw(5))
         }
     }
 
@@ -799,25 +794,20 @@ impl<Proj> HalfEdge<Proj> {
             let mut edge = edge;
             let mut dir = dir;
             while dir > HalfEdgeDir::Up {
-                edge = edge.prev().complement();
+                edge = edge.prev().twin();
                 dir = dir.rotate_ccw(5);
             }
             Self::on_edge_exclusive(sphere, edge, 0, 0, HalfEdgeDir::Up)
         } else if start_u == sphere.b() && dir == HalfEdgeDir::Up {
             let c = sphere.c();
-            Self::on_edge_u_boundary(
-                sphere,
-                edge.complement().prev().complement(),
-                c,
-                HalfEdgeDir::UnVp,
-            )
+            Self::on_edge_u_boundary(sphere, edge.twin().prev().twin(), c, HalfEdgeDir::UnVp)
         } else if dir < HalfEdgeDir::Un {
             Self::on_edge_exclusive(sphere, edge, start_u, 0, dir)
         } else if start_u <= sphere.c() {
-            Self::on_edge_v_boundary(sphere, edge.complement().next(), start_u, dir.rotate_ccw(1))
+            Self::on_edge_v_boundary(sphere, edge.twin().next(), start_u, dir.rotate_ccw(1))
         } else {
             let start_u = sphere.b() - start_u;
-            Self::on_interior_boundary(sphere, edge.complement(), start_u, dir.rotate_ccw(3))
+            Self::on_interior_boundary(sphere, edge.twin(), start_u, dir.rotate_ccw(3))
         }
     }
 
@@ -841,7 +831,7 @@ impl<Proj> HalfEdge<Proj> {
                     dir,
                 };
             }
-            1 => edge.complement(),
+            1 => edge.twin(),
             _ => {
                 if edge.inside().owns_edge_2() {
                     let start_u = sphere.b() - start_u;
@@ -854,7 +844,7 @@ impl<Proj> HalfEdge<Proj> {
                         dir: dir.rotate_ccw(3),
                     };
                 } else {
-                    edge.complement()
+                    edge.twin()
                 }
             }
         };
@@ -944,7 +934,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
         Vertex::new(self.sphere.clone(), self.region, self.start_u, self.start_v)
     }
 
-    fn complement(&self) -> HalfEdge<Proj> {
+    fn twin(&self) -> HalfEdge<Proj> {
         let [d_u, d_v] = self.dir.into_vec();
         HalfEdge::new(
             self.sphere.clone(),
@@ -1246,7 +1236,7 @@ impl BaseRegion {
         if self.ty() == BaseRegionType::Edge0 {
             self.owner().side(0)
         } else {
-            self.owner().side(2).complement()
+            self.owner().side(2).twin()
         }
     }
 }
@@ -1362,7 +1352,7 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
             } else {
                 self.sphere
                     .projector()
-                    .inside(region.as_edge().complement())
+                    .inside(region.as_edge().twin())
                     .to_sphere(vec::add([1.0, 0.0], vec::neg(coords)))
             }
         } else {
@@ -1413,13 +1403,13 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
                 if face.owns_edge_2() {
                     return (BaseRegion::new(face, BaseRegionType::Edge2), [r_u, r_v]);
                 } else {
-                    (face.side(2).complement(), [r_u, r_v])
+                    (face.side(2).twin(), [r_u, r_v])
                 }
             }
         } else if v >= 0.0 {
             let r_u = ((b as f64 - v).max(0.0) as u32).min(b - 1);
             let r_v = ((u - (n as f64 - v)) as u32).min(c - 1);
-            (face.side(1).complement(), [r_u, r_v])
+            (face.side(1).twin(), [r_u, r_v])
         } else {
             let r_u = (u as u32).min(b - 1);
             let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);

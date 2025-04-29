@@ -464,21 +464,21 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
         }
     }
 
-    fn complement(&self) -> Self {
+    fn twin(&self) -> Self {
         Self {
-            kis: self.kis.complement(),
+            kis: self.kis.twin(),
         }
     }
 
     fn prev(&self) -> Self {
         Self {
-            kis: self.kis.prev().complement().prev(),
+            kis: self.kis.prev().twin().prev(),
         }
     }
 
     fn next(&self) -> Self {
         Self {
-            kis: self.kis.next().complement().next(),
+            kis: self.kis.next().twin().next(),
         }
     }
 }

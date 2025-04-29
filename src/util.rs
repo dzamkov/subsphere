@@ -112,15 +112,15 @@ where
             assert_eq!(e.outgoing_index(), edge_index, "edge index mismatch");
             edge_index += 1;
             if let Some(prev) = prev {
-                assert_eq!(e.complement().next(), prev, "outgoing prev mismatch");
-                assert_eq!(prev.prev().complement(), e, "outgoing next mismatch");
+                assert_eq!(e.twin().next(), prev, "outgoing prev mismatch");
+                assert_eq!(prev.prev().twin(), e, "outgoing next mismatch");
             }
             prev = Some(e);
         }
         if let Some(prev) = prev {
             let e = v.outgoing(0);
-            assert_eq!(e.complement().next(), prev, "outgoing prev mismatch");
-            assert_eq!(prev.prev().complement(), e, "outgoing next mismatch");
+            assert_eq!(e.twin().next(), prev, "outgoing prev mismatch");
+            assert_eq!(prev.prev().twin(), e, "outgoing next mismatch");
         }
         assert_eq!(edge_index, v.degree(), "vertex degree mismatch");
     }
