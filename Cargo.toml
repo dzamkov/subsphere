@@ -12,3 +12,10 @@ readme = "README.md"
 
 [workspace]
 members = ["render"]
+
+[dev-dependencies]
+divan = "0.1.21"
+
+[[bench]]
+name = "tessellation"
+harness = false
