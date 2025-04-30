@@ -18,7 +18,8 @@ tessellations, and the elements within them, are represented implicitly. They ar
 zero-allocation `Copy` types that can be used to generate geometry on the fly. This lets you work
 with massive tessellations using very little memory.
 
-* **Versatility:** This crate allows you to explore a huge variety of tessellations, all sharing a
+* **Versatility:** This crate allows you to explore a
+[huge variety](https://github.com/dzamkov/subsphere/blob/master/catalog.md) of tessellations, all sharing a
 common API. There's a bunch of adjustable parameters and you're free to mix-and-match topologies
 and projections to tune the tessellation to your needs.
 

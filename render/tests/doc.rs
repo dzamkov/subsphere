@@ -72,7 +72,7 @@ fn render(sphere: &impl subsphere::Sphere, name: &str) {
             .to_rgb8();
         assert!(
             im == ref_im,
-            "rendered image does not match reference: {}",
+            "rendered image does not match reference: {}. Re-run with `OVERWRITE=1` to update it",
             name
         );
     }
