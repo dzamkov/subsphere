@@ -6,11 +6,11 @@ measurements of their "quality" in terms of certain metrics:
 * **Area:** The relative difference between the area of the largest face and the smallest face.
 This excludes non-hexagonal faces in hexagonal tessellations.
 
-* **Length:** Considering all faces, the maximum relative difference between the length of the
-longest edge and the shortest edge of that face.
+* **Length:** Considering faces whose vertices have the same degree, the maximum relative
+difference between the length of the longest edge and the shortest edge of that face.
 
-* **Angle:** Considering all faces, the maximum absolute difference between the interior angles
-of the face.
+* **Angle:** Considering faces whose vertices have the same degree, the maximum absolute difference
+between the interior angles of the face.
 
 Since most types of tessellations have configurable integer parameters, representative instances
 are chosen such that the number of faces is approximately 2000. This provides a "fair" comparison
@@ -22,18 +22,18 @@ between tessellations of different types.
 
 | Base    | Projector  | B  | C | # Faces | # Verts | Area    | Length | Angle   |
 | ------- | ---------- | -- | - | ------- | ------- | ------- | ------ | ------- |
-| `Icosa` | `Gnomonic` | 10 | 0 | 2000    | 1002    | 78.39%  | 17.44% | 17.88°  |
-| `Icosa` | `Gnomonic` | 8  | 3 | 1940    | 972     | 93.86%  | 17.45% | 17.88°  |
-| `Icosa` | `Gnomonic` | 6  | 6 | 2160    | 1082    | 99.99%  | 17.46% | 17.90°  |
-| `Icosa` | `Fuller`   | 10 | 0 | 2000    | 1002    | 14.73%  | 17.40% | 17.83°  |
-| `Icosa` | `Fuller`   | 8  | 3 | 1940    | 972     | 24.12%  | 18.30% | 17.84°  |
-| `Icosa` | `Fuller`   | 6  | 6 | 2160    | 1082    | 26.27%  | 17.43% | 17.86°  |
-| `Octo`  | `Gnomonic` | 16 | 0 | 2048    | 1026    | 356.37% | 41.37% | 44.94°  |
-| `Octo`  | `Gnomonic` | 13 | 5 | 2072    | 1038    | 499.91% | 47.67% | 44.95°  |
-| `Octo`  | `Gnomonic` | 9  | 9 | 1944    | 974     | 559.14% | 43.09% | 44.95°  |
-| `Octo`  | `Fuller`   | 16 | 0 | 2048    | 1026    | 62.60%  | 41.31% | 44.86°  |
-| `Octo`  | `Fuller`   | 13 | 5 | 2072    | 1038    | 111.36% | 53.81% | 44.89°  |
-| `Octo`  | `Fuller`   | 9  | 9 | 1944    | 974     | 129.43% | 50.51% | 44.90°  |
+| `Icosa` | `Gnomonic` | 10 | 0 | 2000    | 1002    | 78.39%  | 14.65% | 14.42°  |
+| `Icosa` | `Gnomonic` | 8  | 3 | 1940    | 972     | 93.86%  | 14.51% | 13.83°  |
+| `Icosa` | `Gnomonic` | 6  | 6 | 2160    | 1082    | 99.99%  | 12.13% | 11.31°  |
+| `Icosa` | `Fuller`   | 10 | 0 | 2000    | 1002    | 14.73%  | 16.96% | 16.72°  |
+| `Icosa` | `Fuller`   | 8  | 3 | 1940    | 972     | 24.12%  | 18.30% | 16.67°  |
+| `Icosa` | `Fuller`   | 6  | 6 | 2160    | 1082    | 26.27%  | 16.79% | 15.89°  |
+| `Octo`  | `Gnomonic` | 16 | 0 | 2048    | 1026    | 356.37% | 40.52% | 40.90°  |
+| `Octo`  | `Gnomonic` | 13 | 5 | 2072    | 1038    | 499.91% | 47.67% | 40.03°  |
+| `Octo`  | `Gnomonic` | 9  | 9 | 1944    | 974     | 559.14% | 43.09% | 32.14°  |
+| `Octo`  | `Fuller`   | 16 | 0 | 2048    | 1026    | 62.60%  | 41.02% | 42.63°  |
+| `Octo`  | `Fuller`   | 13 | 5 | 2072    | 1038    | 111.36% | 53.81% | 42.56°  |
+| `Octo`  | `Fuller`   | 9  | 9 | 1944    | 974     | 129.43% | 50.51% | 40.73°  |
  |
 ## [`HexSphere`](https://docs.rs/subsphere/latest/subsphere/hex/struct.HexSphere.html)
 
