@@ -7,10 +7,12 @@ pub use std::f64::consts::PI;
 pub(crate) mod vec {
     /// Negates a vector.
     #[inline]
-    pub fn neg<const N: usize>(a: [f64; N]) -> [f64; N] {
+    pub const fn neg<const N: usize>(a: [f64; N]) -> [f64; N] {
         let mut res = [0.0; N];
-        for i in 0..N {
+        let mut i = 0;
+        while i < N {
             res[i] = -a[i];
+            i += 1;
         }
         res
     }
@@ -29,10 +31,12 @@ pub(crate) mod vec {
 
     /// Subtracts `b` from `a`.
     #[inline]
-    pub fn sub<const N: usize>(a: [f64; N], b: [f64; N]) -> [f64; N] {
+    pub const fn sub<const N: usize>(a: [f64; N], b: [f64; N]) -> [f64; N] {
         let mut res = [0.0; N];
-        for i in 0..N {
+        let mut i = 0;
+        while i < N {
             res[i] = a[i] - b[i];
+            i += 1;
         }
         res
     }
@@ -51,10 +55,12 @@ pub(crate) mod vec {
 
     /// Divides a vector by a scalar.
     #[inline]
-    pub fn div<const N: usize>(a: [f64; N], b: f64) -> [f64; N] {
+    pub const fn div<const N: usize>(a: [f64; N], b: f64) -> [f64; N] {
         let mut res = [0.0; N];
-        for i in 0..N {
+        let mut i = 0;
+        while i < N {
             res[i] = a[i] / b;
+            i += 1;
         }
         res
     }
@@ -73,7 +79,7 @@ pub(crate) mod vec {
 
     /// Computes the cross product of two vectors.
     #[inline]
-    pub fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    pub const fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
         [
             a[1] * b[2] - a[2] * b[1],
             a[2] * b[0] - a[0] * b[2],
@@ -94,29 +100,31 @@ pub(crate) mod mat {
 
     /// Multiplies a matrix with a vector.
     #[inline]
-    pub fn apply<const N: usize, const M: usize>(mat: [[f64; N]; M], vec: [f64; M]) -> [f64; N] {
+    pub const fn apply<const N: usize, const M: usize>(mat: [[f64; N]; M], vec: [f64; M]) -> [f64; N] {
         let mut res = [0.0; N];
-        for i in 0..M {
+        let mut i = 0;
+        while i < M {
             res = vec::add(res, vec::mul(mat[i], vec[i]));
+            i += 1;
         }
         res
     }
 
     /// Computes the determinant of a 3x3 matrix.
     #[inline]
-    pub fn det_3(m: [[f64; 3]; 3]) -> f64 {
+    pub const fn det_3(m: [[f64; 3]; 3]) -> f64 {
         vec::dot(m[0], vec::cross(m[1], m[2]))
     }
 
     /// Computes the determinant of a 2x2 matrix.
     #[inline]
-    pub fn det_2(m: [[f64; 2]; 2]) -> f64 {
+    pub const fn det_2(m: [[f64; 2]; 2]) -> f64 {
         m[0][0] * m[1][1] - m[0][1] * m[1][0]
     }
 
     /// Computes the adjoint of a 2x2 matrix.
     #[inline]
-    pub fn adjoint_2(m: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+    pub const fn adjoint_2(m: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
         let [[a, b], [c, d]] = m;
         [[d, -b], [-c, a]]
     }
