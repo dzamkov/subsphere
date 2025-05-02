@@ -15,12 +15,11 @@ fn tessellation_vertex_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessel
 }
 
 fn tessellation_face_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessellation) {
-    black_box(
-        sphere.faces()
-            .for_each(|face| {
-                black_box(face.vertices().collect::<Vec<_>>());
-            })
-    );
+    let mut indices = Vec::new();
+    for face in sphere.faces() {
+        indices.extend(face.vertices().map(|v| v.index()));
+    }
+    black_box(indices);
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
