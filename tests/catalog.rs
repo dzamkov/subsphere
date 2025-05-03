@@ -326,7 +326,7 @@ fn get_table_base(
     let value = get_table_str(column, header, row)?;
     match value {
         "`Icosa`" => Some(subsphere::BaseTriSphere::Icosa),
-        "`Octo`" => Some(subsphere::BaseTriSphere::Octo),
+        "`Octa`" => Some(subsphere::BaseTriSphere::Octa),
         "`Tetra`" => Some(subsphere::BaseTriSphere::Tetra),
         _ => None,
     }

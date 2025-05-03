@@ -9,8 +9,10 @@ pub enum BaseTriSphere {
     /// A tessellation of the unit sphere constructed by projecting an icosahedron onto it.
     #[default]
     Icosa = 0,
-    /// A tessellation of the unit sphere constructed by projecting an octohedron onto it.
-    Octo = 1,
+
+    /// A tessellation of the unit sphere constructed by projecting an octahedron onto it.
+    Octa = 1,
+
     /// A tessellation of the unit sphere constructed by projecting a tetrahedron onto it.
     Tetra = 2,
 }
@@ -54,8 +56,8 @@ impl BaseTriSphere {
     }
 
     /// Returns the constant value corresponding to this base shape.
-    const fn lookup<const ICOSA: u8, const OCTO: u8, const TETRA: u8>(self) -> u8 {
-        ((((TETRA as u32) << 16) | ((OCTO as u32) << 8) | ICOSA as u32) >> (self as u32 * 8)) as u8
+    const fn lookup<const ICOSA: u8, const OCTA: u8, const TETRA: u8>(self) -> u8 {
+        ((((TETRA as u32) << 16) | ((OCTA as u32) << 8) | ICOSA as u32) >> (self as u32 * 8)) as u8
     }
 
     /// Determines which face contains the given point on the unit sphere.
@@ -65,9 +67,9 @@ impl BaseTriSphere {
                 let index = icosa_point_index(point);
                 ICOSA_FACE_AT[index as usize]
             }
-            BaseTriSphere::Octo => {
-                let index = octo_point_index(point);
-                Face((OCTO_FACE_AT >> (index * 8)) as u8)
+            BaseTriSphere::Octa => {
+                let index = octa_point_index(point);
+                Face((OCTA_FACE_AT >> (index * 8)) as u8)
             }
             BaseTriSphere::Tetra => todo!(),
         }
@@ -178,7 +180,7 @@ impl Face {
 fn test_center_face_at() {
     use crate::Sphere;
     // TODO: Extend to other spheres
-    for sphere in [BaseTriSphere::Icosa, BaseTriSphere::Octo] {
+    for sphere in [BaseTriSphere::Icosa, BaseTriSphere::Octa] {
         for face in sphere.faces() {
             let center = face.center();
             assert!((vec::dot(center, center) - 1.0).abs() < 1.0e-12);
@@ -525,7 +527,7 @@ static TWIN: [[HalfEdge; 3]; NUM_FACES] = const {
 
 /// Given a point on the unit sphere, gets an index which can be used to identify which
 /// icosahedron [`Face`] contains it.
-/// 
+///
 /// The indexing scheme is arbitrary, but points on different [`Face`]s must have different
 /// indices.
 const fn icosa_point_index(point: [f64; 3]) -> u8 {
@@ -545,7 +547,7 @@ const fn icosa_point_index(point: [f64; 3]) -> u8 {
 
 /// A lookup table which identifies which [`Face`] corresponds to a particular result from
 /// [`icosa_point_index`].
-/// 
+///
 /// For indices that don't correspond exactly to a face, this will provide an arbitrary
 /// nearby [`Face`].
 static ICOSA_FACE_AT: [Face; 243] = const {
@@ -601,23 +603,23 @@ static ICOSA_FACE_AT: [Face; 243] = const {
 };
 
 /// Given a point on the unit sphere, gets an index which can be used to identify which
-/// octohedron [`Face`] contains it.
+/// octahedron [`Face`] contains it.
 ///
 /// The indexing scheme is arbitrary, but points on different [`Face`]s must have different
 /// indices.
-const fn octo_point_index([x, y, z]: [f64; 3]) -> u8 {
+const fn octa_point_index([x, y, z]: [f64; 3]) -> u8 {
     (((x >= 0.0) as u8) << 2) | (((y >= 0.0) as u8) << 1) | ((z >= 0.0) as u8)
 }
 
 /// A compact lookup table which identifies which [`Face`] corresponds to a particular result
-/// from [`octo_point_index`].
-const OCTO_FACE_AT: u64 = const {
-    let sphere = BaseTriSphere::Octo;
+/// from [`octa_point_index`].
+const OCTA_FACE_AT: u64 = const {
+    let sphere = BaseTriSphere::Octa;
     let mut i = sphere.first_face_inner();
     let mut res = 0;
     while i < sphere.last_face_inner() {
         let face = Face(i);
-        let j = octo_point_index(face.center());
+        let j = octa_point_index(face.center());
         res |= (i as u64) << (j * 8);
         i += 1;
     }
@@ -648,7 +650,7 @@ static VERTS: [[f64; 3]; NUM_VERTS] = [
     [-C_2, -C_3, -C_1],
     // Icosahedron bottom apex
     [0.0, 0.0, -1.0],
-    // Octohedron
+    // Octahedron
     [0.0, 0.0, 1.0],
     [1.0, 0.0, 0.0],
     [0.0, 1.0, 0.0],
@@ -682,12 +684,12 @@ static INDICES: [[u8; 3]; NUM_FACES] = [
     [7, 11, 8],
     [8, 11, 9],
     [9, 11, 10],
-    // Octohedron top cap
+    // Octahedron top cap
     [12, 13, 14],
     [12, 14, 15],
     [12, 15, 16],
     [12, 16, 13],
-    // Octohedron bottom cap
+    // Octahedron bottom cap
     [16, 17, 13],
     [13, 17, 14],
     [14, 17, 15],

@@ -1,29 +1,29 @@
 //! This test module produces renders for the documentation of the `subsphere` crate.
 
 #[test]
-fn test_trisphere_icosa_3_1_gnomonic() {
+fn test_trisphere_icosa_gnomonic_3_1() {
     let sphere = subsphere::TriSphere::new(
         subsphere::BaseTriSphere::Icosa,
         subsphere::proj::Gnomonic,
         std::num::NonZero::new(3).unwrap(),
         1,
     );
-    render(&sphere, "trisphere_icosa_3_1_gnomonic");
+    render(&sphere, "trisphere_icosa_gnomonic_3_1");
 }
 
 #[test]
-fn test_trisphere_icosa_3_1_fuller() {
+fn test_trisphere_icosa_fuller_3_1() {
     let sphere = subsphere::TriSphere::new(
         subsphere::BaseTriSphere::Icosa,
         subsphere::proj::Fuller,
         std::num::NonZero::new(3).unwrap(),
         1,
     );
-    render(&sphere, "trisphere_icosa_3_1_fuller");
+    render(&sphere, "trisphere_icosa_fuller_3_1");
 }
 
 #[test]
-fn test_hexsphere_icosa_8_2_gnomonic() {
+fn test_hexsphere_icosa_gnomonic_8_2() {
     let sphere = subsphere::HexSphere::from_kis(subsphere::TriSphere::new(
         subsphere::BaseTriSphere::Icosa,
         subsphere::proj::Gnomonic,
@@ -31,11 +31,11 @@ fn test_hexsphere_icosa_8_2_gnomonic() {
         2,
     ))
     .unwrap();
-    render(&sphere, "hexsphere_icosa_8_2_gnomonic");
+    render(&sphere, "hexsphere_icosa_gnomonic_8_2");
 }
 
 #[test]
-fn test_hexsphere_icosa_8_2_fuller() {
+fn test_hexsphere_icosa_fuller_8_2() {
     let sphere = subsphere::HexSphere::from_kis(subsphere::TriSphere::new(
         subsphere::BaseTriSphere::Icosa,
         subsphere::proj::Fuller,
@@ -43,7 +43,7 @@ fn test_hexsphere_icosa_8_2_fuller() {
         2,
     ))
     .unwrap();
-    render(&sphere, "hexsphere_icosa_8_2_fuller");
+    render(&sphere, "hexsphere_icosa_fuller_8_2");
 }
 
 /// Renders the given sphere with the given name.

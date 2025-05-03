@@ -47,9 +47,9 @@ fn trisphere_icosa_gnomonic_b_0_vertex(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn trisphere_octo_fuller_b_0_vertex(b: u32) {
+fn trisphere_octa_fuller_b_0_vertex(b: u32) {
     let sphere = subsphere::TriSphere::new(
-        subsphere::BaseTriSphere::Octo,
+        subsphere::BaseTriSphere::Octa,
         subsphere::proj::Fuller,
         NonZero::new(b).unwrap(),
         0,
@@ -59,9 +59,9 @@ fn trisphere_octo_fuller_b_0_vertex(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn trisphere_octo_gnomonic_b_0_vertex(b: u32) {
+fn trisphere_octa_gnomonic_b_0_vertex(b: u32) {
     let sphere = subsphere::TriSphere::new(
-        subsphere::BaseTriSphere::Octo,
+        subsphere::BaseTriSphere::Octa,
         subsphere::proj::Gnomonic,
         NonZero::new(b).unwrap(),
         0,
@@ -95,9 +95,9 @@ fn trisphere_icosa_gnomonic_b_0_face(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn trisphere_octo_fuller_b_0_face(b: u32) {
+fn trisphere_octa_fuller_b_0_face(b: u32) {
     let sphere = subsphere::TriSphere::new(
-        subsphere::BaseTriSphere::Octo,
+        subsphere::BaseTriSphere::Octa,
         subsphere::proj::Fuller,
         NonZero::new(b).unwrap(),
         0,
@@ -107,9 +107,9 @@ fn trisphere_octo_fuller_b_0_face(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn trisphere_octo_gnomonic_b_0_face(b: u32) {
+fn trisphere_octa_gnomonic_b_0_face(b: u32) {
     let sphere = subsphere::TriSphere::new(
-        subsphere::BaseTriSphere::Octo,
+        subsphere::BaseTriSphere::Octa,
         subsphere::proj::Gnomonic,
         NonZero::new(b).unwrap(),
         0,
@@ -151,12 +151,12 @@ fn hexsphere_icosa_gnomonic_b_bmod3_vertex(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn hexsphere_octo_fuller_b_bmod3_vertex(b: u32) {
+fn hexsphere_octa_fuller_b_bmod3_vertex(b: u32) {
     let c = b % 3;
     
     let sphere = subsphere::HexSphere::from_kis(
         subsphere::TriSphere::new(
-            subsphere::BaseTriSphere::Octo,
+            subsphere::BaseTriSphere::Octa,
             subsphere::proj::Fuller,
             NonZero::new(b).unwrap(),
             c,
@@ -167,12 +167,12 @@ fn hexsphere_octo_fuller_b_bmod3_vertex(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn hexsphere_octo_gnomonic_b_bmod3_vertex(b: u32) {
+fn hexsphere_octa_gnomonic_b_bmod3_vertex(b: u32) {
     let c = b % 3;
     
     let sphere = subsphere::HexSphere::from_kis(
         subsphere::TriSphere::new(
-            subsphere::BaseTriSphere::Octo,
+            subsphere::BaseTriSphere::Octa,
             subsphere::proj::Gnomonic,
             NonZero::new(b).unwrap(),
             c,
@@ -215,12 +215,12 @@ fn hexsphere_icosa_gnomonic_b_bmod3_face(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn hexsphere_octo_fuller_b_bmod3_face(b: u32) {
+fn hexsphere_octa_fuller_b_bmod3_face(b: u32) {
     let c = b % 3;
     
     let sphere = subsphere::HexSphere::from_kis(
         subsphere::TriSphere::new(
-            subsphere::BaseTriSphere::Octo,
+            subsphere::BaseTriSphere::Octa,
             subsphere::proj::Fuller,
             NonZero::new(b).unwrap(),
             c,
@@ -231,12 +231,12 @@ fn hexsphere_octo_fuller_b_bmod3_face(b: u32) {
 }
 
 #[divan::bench(args = [1, 2, 4, 8, 16, 32, 64, 128])]
-fn hexsphere_octo_gnomonic_b_bmod3_face(b: u32) {
+fn hexsphere_octa_gnomonic_b_bmod3_face(b: u32) {
     let c = b % 3;
     
     let sphere = subsphere::HexSphere::from_kis(
         subsphere::TriSphere::new(
-            subsphere::BaseTriSphere::Octo,
+            subsphere::BaseTriSphere::Octa,
             subsphere::proj::Gnomonic,
             NonZero::new(b).unwrap(),
             c,
