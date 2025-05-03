@@ -34,7 +34,7 @@ between tessellations of different types.
 | `Octa`  | `Fuller`   | 16 | 0 | 2048    | 1026    | 62.60%  | 41.02% | 42.63°  |
 | `Octa`  | `Fuller`   | 13 | 5 | 2072    | 1038    | 111.36% | 53.81% | 42.56°  |
 | `Octa`  | `Fuller`   | 9  | 9 | 1944    | 974     | 129.43% | 50.51% | 40.73°  |
- |
+
 ## [`HexSphere`](https://docs.rs/subsphere/latest/subsphere/hex/struct.HexSphere.html)
 
 ![Example hexagonal tessellation](https://github.com/dzamkov/subsphere/blob/master/render/out/hexsphere_icosa_fuller_8_2.png?raw=true)
