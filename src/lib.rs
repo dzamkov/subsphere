@@ -28,13 +28,13 @@ pub fn icosphere() -> TriSphere {
     )
 }
 
-/// Constructs a tessellation of the unit sphere by projecting an octohedron onto it.
+/// Constructs a tessellation of the unit sphere by projecting an octahedron onto it.
 ///
 /// The tessellation can be refined by calling methods such as [`TriSphere::subdivide_edge`] or
 /// [`TriSphere::truncate`].
-pub fn octosphere() -> TriSphere {
+pub fn octasphere() -> TriSphere {
     TriSphere::new(
-        BaseTriSphere::Octo,
+        BaseTriSphere::Octa,
         Default::default(),
         NonZero::new(1).unwrap(),
         0,

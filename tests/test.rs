@@ -1,25 +1,26 @@
 use std::num::NonZero;
 use subsphere::util::validate;
-use subsphere::{BaseTriSphere, Face, HalfEdge, HexSphere, Sphere, TriSphere, Vertex, proj};
+use subsphere::prelude::*;
+use subsphere::{proj, TriSphere, BaseTriSphere, HexSphere};
 
 #[test]
-fn test_octosphere_base() {
-    let sphere = subsphere::octosphere();
+fn test_octasphere() {
+    let sphere = subsphere::octasphere();
     validate_tri(sphere);
     validate(sphere);
 }
 
 #[test]
-fn test_octosphere_4_0() {
+fn test_trisphere_octa_gnomonic_4_0() {
     let sphere = TriSphere::new(
-        BaseTriSphere::Octo,
+        BaseTriSphere::Octa,
         proj::Gnomonic,
         NonZero::new(4).unwrap(),
         0,
     );
     assert_eq!(
         sphere,
-        subsphere::octosphere()
+        subsphere::octasphere()
             .subdivide_edge(NonZero::new(4).unwrap())
             .with_projector(proj::Gnomonic)
     );
@@ -28,9 +29,9 @@ fn test_octosphere_4_0() {
 }
 
 #[test]
-fn test_octosphere_3_1() {
+fn test_trisphere_octa_gnomonic_3_1() {
     let sphere = TriSphere::new(
-        BaseTriSphere::Octo,
+        BaseTriSphere::Octa,
         proj::Gnomonic,
         NonZero::new(3).unwrap(),
         1,
@@ -40,9 +41,9 @@ fn test_octosphere_3_1() {
 }
 
 #[test]
-fn test_octosphere_2_2() {
+fn test_trisphere_octa_gnomonic_2_2() {
     let sphere = TriSphere::new(
-        BaseTriSphere::Octo,
+        BaseTriSphere::Octa,
         proj::Gnomonic,
         NonZero::new(2).unwrap(),
         2,
@@ -52,7 +53,7 @@ fn test_octosphere_2_2() {
 }
 
 #[test]
-fn test_icosphere_base() {
+fn test_icosphere() {
     let sphere = TriSphere::from(BaseTriSphere::Icosa);
     assert_eq!(sphere, subsphere::icosphere());
     validate_tri(sphere);
@@ -60,7 +61,7 @@ fn test_icosphere_base() {
 }
 
 #[test]
-fn test_icosphere_4_0() {
+fn test_trisphere_icosa_gnomonic_4_0() {
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -72,7 +73,7 @@ fn test_icosphere_4_0() {
 }
 
 #[test]
-fn test_icosphere_3_1() {
+fn test_trisphere_icosa_gnomonic_3_1() {
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -84,7 +85,7 @@ fn test_icosphere_3_1() {
 }
 
 #[test]
-fn test_icosphere_2_2() {
+fn test_trisphere_icosa_gnomonic_2_2() {
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -96,7 +97,7 @@ fn test_icosphere_2_2() {
 }
 
 #[test]
-fn test_hexsphere_6_0() {
+fn test_hexsphere_icosa_gnomonic_6_0() {
     let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -115,7 +116,7 @@ fn test_hexsphere_6_0() {
 }
 
 #[test]
-fn test_hexsphere_4_1() {
+fn test_hexsphere_icosa_gnomonic_4_1() {
     let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -127,7 +128,7 @@ fn test_hexsphere_4_1() {
 }
 
 #[test]
-fn test_hexsphere_7_1() {
+fn test_hexsphere_icosa_gnomonic_7_1() {
     let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -139,7 +140,7 @@ fn test_hexsphere_7_1() {
 }
 
 #[test]
-fn test_hexsphere_2_2() {
+fn test_hexsphere_icosa_gnomonic_2_2() {
     let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -151,7 +152,7 @@ fn test_hexsphere_2_2() {
 }
 
 #[test]
-fn test_hexsphere_8_2() {
+fn test_hexsphere_icosa_gnomonic_8_2() {
     let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -163,7 +164,7 @@ fn test_hexsphere_8_2() {
 }
 
 #[test]
-fn test_hexsphere_3_3() {
+fn test_hexsphere_icosa_gnomonic_3_3() {
     let sphere = HexSphere::from_kis(TriSphere::new(
         BaseTriSphere::Icosa,
         proj::Gnomonic,
@@ -187,8 +188,8 @@ where
     }
 }
 
-/// Converts the given [`Sphere`] to an OBJ file, returning the UTF-8 bytes of the file.
-fn to_obj(sphere: impl Sphere) -> Vec<u8> {
+/// Converts the given [`subsphere::Sphere`] to an OBJ file, returning the UTF-8 bytes of the file.
+fn to_obj(sphere: impl subsphere::Sphere) -> Vec<u8> {
     let mut obj = String::new();
     for v in sphere.vertices() {
         let pos = v.pos();

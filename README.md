@@ -8,8 +8,8 @@ This crate provides a general, easy-to-use API for working with tessellated sphe
 whose surface is partitioned into polygonal cells. It includes implementations for a variety of
 such tessellations.
 
-![Example hexagonal tessellation](https://github.com/dzamkov/subsphere/blob/master/render/out/hexsphere_icosa_8_2_fuller.png?raw=true)
-![Example triangular tessellation](https://github.com/dzamkov/subsphere/blob/master/render/out/trisphere_icosa_3_1_fuller.png?raw=true)
+![Example hexagonal tessellation](https://github.com/dzamkov/subsphere/blob/master/render/out/hexsphere_icosa_fuller_8_2.png?raw=true)
+![Example triangular tessellation](https://github.com/dzamkov/subsphere/blob/master/render/out/trisphere_icosa_fuller_3_1.png?raw=true)
 
 ## Features
 

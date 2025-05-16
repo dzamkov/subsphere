@@ -252,7 +252,7 @@ fn check_row<Sphere: subsphere::Sphere + Copy>(
             }
             "Length" => {
                 let mut len_discrepancy: f64 = 0.0;
-                for f in sphere.faces() {
+                for f in sphere.faces().filter(is_face_normal) {
                     let mut min_len = f64::MAX;
                     let mut max_len = f64::MIN;
                     for s in f.sides() {
@@ -271,7 +271,7 @@ fn check_row<Sphere: subsphere::Sphere + Copy>(
             }
             "Angle" => {
                 let mut angle_discrepancy: f64 = 0.0;
-                for f in sphere.faces() {
+                for f in sphere.faces().filter(is_face_normal) {
                     let mut min_angle = f64::MAX;
                     let mut max_angle = f64::MIN;
                     for s in f.sides() {
@@ -293,6 +293,24 @@ fn check_row<Sphere: subsphere::Sphere + Copy>(
     }
 }
 
+/// Indicates whether all vertices of the given face have the same degree.
+/// 
+/// If this is `false`, distortion of the face is expected, so it should not be considered in
+/// quality measurements.
+fn is_face_normal(face: &impl subsphere::Face) -> bool {
+    let mut degree = None;
+    for v in face.vertices() {
+        if let Some(d) = degree {
+            if v.degree() != d {
+                return false;
+            }
+        } else {
+            degree = Some(v.degree());
+        }
+    }
+    true
+}
+
 /// Gets the value of a table cell as a string.
 fn get_table_str<'a>(column: &str, header: &[&str], row: &'a [Cow<str>]) -> Option<&'a str> {
     let index = header.iter().position(|&s| s == column)?;
@@ -308,7 +326,7 @@ fn get_table_base(
     let value = get_table_str(column, header, row)?;
     match value {
         "`Icosa`" => Some(subsphere::BaseTriSphere::Icosa),
-        "`Octo`" => Some(subsphere::BaseTriSphere::Octo),
+        "`Octa`" => Some(subsphere::BaseTriSphere::Octa),
         "`Tetra`" => Some(subsphere::BaseTriSphere::Tetra),
         _ => None,
     }
