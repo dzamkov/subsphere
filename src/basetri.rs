@@ -267,7 +267,7 @@ impl HalfEdge {
         self.inside().sphere()
     }
 
-    /// The index of this half-edge within the [`sides`](crate::Face::sides) list of its
+    /// The index of this half-edge within the [`sides`](Face::sides) list of its
     /// [`inside`](HalfEdge::inside).
     pub const fn side_index(self) -> usize {
         (self.0 & 0b11) as usize

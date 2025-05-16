@@ -138,20 +138,20 @@ pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> impl Iterator<Item = f64> 
     // formula for small leading coefficients?
     if a.abs() < SMALL {
         let disc = c * c - 4.0 * b * d;
-        if disc >= 0.0 {
+        return if disc >= 0.0 {
             let u = -c - c.signum() * disc.sqrt();
             let mut iter = [0.0, u / (2.0 * b), 2.0 * d / u].into_iter();
             iter.next().unwrap();
             if b.abs() < SMALL {
                 iter.next().unwrap();
             }
-            return iter;
+            iter
         } else {
             let mut iter = [0.0, 0.0, 0.0].into_iter();
             iter.next().unwrap();
             iter.next().unwrap();
             iter.next().unwrap();
-            return iter;
+            iter
         }
     }
 

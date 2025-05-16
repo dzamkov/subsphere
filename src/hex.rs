@@ -193,7 +193,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
         self.dual_num_divisions() * self.kis.base().num_faces()
     }
 
-    fn vertex(&self, index: usize) -> Vertex<Proj> {
+    fn vertex(&self, _index: usize) -> Vertex<Proj> {
         todo!()
     }
 

@@ -67,12 +67,12 @@ impl<T: Projection> Projection for Transform<T> {
             .to_sphere(vec::add(self.offset, mat::apply(self.linear, coords)))
     }
 
-    fn from_sphere(&self, point: [f64; 3]) -> [f64; 2] {
+    fn from_sphere(&self, _point: [f64; 3]) -> [f64; 2] {
         todo!()
     }
 
     type Transform = Self;
-    fn transform(self, offset: [f64; 2], linear: [[f64; 2]; 2]) -> Self {
+    fn transform(self, _offset: [f64; 2], _linear: [[f64; 2]; 2]) -> Self {
         todo!()
     }
 }
@@ -132,7 +132,7 @@ pub mod tri {
     }
 
     /// The default [`BaseTriProjector`] used when a projector is not explicitly specified.
-    /// 
+    ///
     /// Ideally, this would be defined as an
     /// [impl Trait](https://github.com/rust-lang/rust/issues/63063), but that is not yet supported
     /// in stable Rust.
@@ -300,14 +300,14 @@ pub mod fuller {
             // Special handling for boundaries to improve accuracy and performance
             if v <= 0.0 {
                 debug_assert_eq!(v, 0.0);
-                if u <= 0.0 {
+                return if u <= 0.0 {
                     debug_assert_eq!(u, 0.0);
-                    return self.points[0];
+                    self.points[0]
                 } else {
-                    return vec::normalize(vec::add(
+                    vec::normalize(vec::add(
                         vec::mul(self.points[0], ((1.0 - u) * self.angle).sin()),
                         vec::mul(self.points[1], (u * self.angle).sin()),
-                    ));
+                    ))
                 }
             } else if u <= 0.0 {
                 debug_assert_eq!(u, 0.0);

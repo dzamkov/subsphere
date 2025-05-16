@@ -32,7 +32,7 @@ impl<Proj> TriSphere<Proj> {
     pub const fn new(base: BaseTriSphere, proj: Proj, b: NonZero<u32>, c: u32) -> Self {
         assert!(
             b.get() < u32::MAX >> 2,
-            "b exceeds maxmimum subdivision size"
+            "b exceeds maximum subdivision size"
         );
         assert!(b.get() >= c, "b must be greater than or equal to c");
         Self {
@@ -164,7 +164,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
         let mut edge_0 = HalfEdge {
             sphere: self.clone(),
             region,
-            start_u: (u + 1),
+            start_u: u + 1,
             start_v: v,
             dir: HalfEdgeDir::UnVp,
         };
@@ -202,7 +202,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
         self.num_faces() / 2 + 2
     }
 
-    fn vertex(&self, index: usize) -> Vertex<Proj> {
+    fn vertex(&self, _index: usize) -> Vertex<Proj> {
         todo!()
     }
 
@@ -264,7 +264,7 @@ fn test_center() {
     use crate::util::tri_area;
     let sphere = TriSphere::new(
         BaseTriSphere::Icosa,
-        crate::proj::Fuller,
+        proj::Fuller,
         NonZero::new(4).unwrap(),
         1,
     );
@@ -894,8 +894,8 @@ impl<Proj> HalfEdge<Proj> {
 }
 
 impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
-    type Vertex = Vertex<Proj>;
     type Face = Face<Proj>;
+    type Vertex = Vertex<Proj>;
 
     fn side_index(&self) -> usize {
         self.dir as usize / 2
@@ -1388,14 +1388,14 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
         let (comp, [r_u, r_v]) = if u + v < n as f64 {
             if u >= 0.0 {
                 let u = u as u32;
-                if v >= 0.0 {
+                return if v >= 0.0 {
                     let v = v as u32;
                     debug_assert!(u + v < n);
-                    return (BaseRegion::new(face, BaseRegionType::Interior), [u, v]);
+                    (BaseRegion::new(face, BaseRegionType::Interior), [u, v])
                 } else {
                     debug_assert!(u < b);
                     let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
-                    return (BaseRegion::new(face, BaseRegionType::Edge0), [u, r_v]);
+                    (BaseRegion::new(face, BaseRegionType::Edge0), [u, r_v])
                 }
             } else {
                 let r_u = ((u + (v + c as f64)).max(0.0) as u32).min(b - 1);
