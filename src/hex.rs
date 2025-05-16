@@ -186,7 +186,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
     }
 
     fn face_at(&self, point: [f64; 3]) -> Face<Proj> {
-        unsafe { Face::from_kis(self.kis.face_at(point)).unwrap_unchecked() }
+        Face::from_kis(self.kis.face_at(point)).unwrap()
     }
 
     fn num_vertices(&self) -> usize {
@@ -269,9 +269,8 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
             (_, false) => [kis.u_0 + 1, kis.v_0],
             (_, true) => [kis.u_0 - 1, kis.v_0 + 1],
         };
-        Some(unsafe {
-            Self::from_center(tri::Vertex::new(kis.sphere, kis.region, u, v)).unwrap_unchecked()
-        })
+        
+        Self::from_center(tri::Vertex::new(kis.sphere, kis.region, u, v))
     }
 
     /// The [`HexSphere`] that this [`Face`] belongs to.
@@ -562,17 +561,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
     fn next(&mut self) -> Option<Face<Proj>> {
         loop {
             if self.u < self.u_end {
-                let res = unsafe {
-                    Face::from_center(tri::Vertex {
-                        sphere: self.sphere.kis.clone(),
-                        region: self.region,
-                        u: self.u,
-                        v: self.v,
-                    })
-                    .unwrap_unchecked()
-                };
+                let res = Face::from_center(tri::Vertex {
+                    sphere: self.sphere.kis.clone(),
+                    region: self.region,
+                    u: self.u,
+                    v: self.v,
+                });
                 self.u += 3;
-                return Some(res);
+                return res;
             } else if self.region.ty().is_edge() {
                 if self.v < self.sphere.kis.c() {
                     self.v += 1;
@@ -582,17 +578,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
                     && self.region.ty() == BaseRegionType::Edge0
                     && self.region.owner().owns_vertex_1()
                 {
-                    let res = unsafe {
-                        Face::from_center(tri::Vertex {
-                            sphere: self.sphere.kis.clone(),
-                            region: self.region,
-                            u: self.u,
-                            v: self.v,
-                        })
-                        .unwrap_unchecked()
-                    };
+                    let res = Face::from_center(tri::Vertex {
+                        sphere: self.sphere.kis.clone(),
+                        region: self.region,
+                        u: self.u,
+                        v: self.v,
+                    });
                     self.u += 3;
-                    return Some(res);
+                    return res;
                 }
             } else {
                 let n = self.sphere.kis.b() - self.sphere.kis.c();

@@ -56,7 +56,7 @@ impl<Proj> TriSphere<Proj> {
 
     /// The base shape of this subdivided sphere.
     pub const fn base(&self) -> BaseTriSphere {
-        unsafe { std::mem::transmute((self.c_base & 0b11) as u8) }
+        BaseTriSphere::from_u8((self.c_base & 0b11) as u8)
     }
 
     /// The [`BaseTriProjector`] for this sphere.
@@ -970,12 +970,16 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
 }
 
 impl HalfEdgeDir {
+    #[inline]
+    pub(crate) const fn from_u8(value: u8) -> Self {
+        unsafe { std::mem::transmute(value) }
+    }
     /// Constructs a [`HalfEdgeDir`] from the given index.
     ///
     /// This corresponds to an angle of `index * 60` degrees.
     pub fn from_index(index: usize) -> Self {
         assert!(index < 6, "index out of bounds: {}", index);
-        unsafe { std::mem::transmute(index as u8) }
+        Self::from_u8(index as u8)
     }
 
     /// Converts this direction into a vector representation.
@@ -988,7 +992,7 @@ impl HalfEdgeDir {
     /// Rotates this [`HalfEdgeDir`] counter-clockwise by `amount * 60` degrees.
     pub fn rotate_ccw(self, amount: usize) -> Self {
         let index = (self as usize + amount) % 6;
-        unsafe { std::mem::transmute(index as u8) }
+        Self::from_u8(index as u8)
     }
 }
 
@@ -1227,7 +1231,7 @@ impl BaseRegion {
 
     /// The general type of this [`BaseRegion`].
     pub fn ty(&self) -> BaseRegionType {
-        unsafe { std::mem::transmute(self.0 & 0b11) }
+        BaseRegionType::from_u8(self.0 & 0b11)
     }
 
     /// Assuming that this region is for an edge, gets the edge corresponding to this region. The
@@ -1265,6 +1269,11 @@ pub(crate) enum BaseRegionType {
 }
 
 impl BaseRegionType {
+    #[inline]
+    pub(crate) const fn from_u8(value: u8) -> Self {
+        unsafe { std::mem::transmute(value) }
+    }
+    
     /// Indicates whether this region corresponds to an edge.
     pub fn is_edge(self) -> bool {
         self != Self::Interior

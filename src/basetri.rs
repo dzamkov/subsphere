@@ -18,6 +18,10 @@ pub enum BaseTriSphere {
 }
 
 impl BaseTriSphere {
+    #[inline]
+    pub(crate) const fn from_u8(value: u8) -> Self {
+        unsafe { std::mem::transmute(value) }
+    }
     /// The degree of the vertices in this base shape.
     pub const fn vertex_degree(self) -> usize {
         self.lookup::<5, 4, 3>() as usize
@@ -129,7 +133,7 @@ pub struct Face(pub(crate) u8);
 impl Face {
     /// Gets the [`BaseTriSphere`] this face belongs to.
     pub const fn sphere(self) -> BaseTriSphere {
-        unsafe { std::mem::transmute(self.0.saturating_sub(12) / 8) }
+        BaseTriSphere::from_u8(self.0.saturating_sub(12) / 8)
     }
 
     /// Indicates whether this face [owns](OwnershipInfo) its second vertex.
@@ -221,7 +225,7 @@ pub struct Vertex(u8);
 impl Vertex {
     /// Gets the [`BaseTriSphere`] this vertex belongs to.
     pub const fn sphere(self) -> BaseTriSphere {
-        unsafe { std::mem::transmute(self.0.saturating_sub(6) / 6) }
+        BaseTriSphere::from_u8(self.0.saturating_sub(6) / 6)
     }
 
     /// Gets the face which [owns](OwnershipInfo) this vertex.
