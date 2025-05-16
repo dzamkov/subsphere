@@ -166,7 +166,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
             region,
             start_u: u + 1,
             start_v: v,
-            dir: HalfEdgeDir::UnVp,
+            dir: HalfEdgeDir::UNVP,
         };
         if mat::det_3([point, v_0, v_1]) < 0.0 {
             std::mem::swap(&mut v_0, &mut v_1);
@@ -313,12 +313,12 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Face for Face<Proj> {
     fn side(&self, index: usize) -> HalfEdge<Proj> {
         assert!(index < 3, "side index out of bounds: {}", index);
         let (d_u, d_v, dir) = [
-            (0, 0, HalfEdgeDir::Up),
-            (0, 0, HalfEdgeDir::Vp),
-            (1, 0, HalfEdgeDir::UnVp),
-            (0, 1, HalfEdgeDir::Un),
-            (0, 1, HalfEdgeDir::Vn),
-            (-1, 1, HalfEdgeDir::UpVn),
+            (0, 0, HalfEdgeDir::UP),
+            (0, 0, HalfEdgeDir::VP),
+            (1, 0, HalfEdgeDir::UNVP),
+            (0, 1, HalfEdgeDir::UN),
+            (0, 1, HalfEdgeDir::VN),
+            (-1, 1, HalfEdgeDir::UPVN),
         ][(index << 1) | self.boundary_along_v as usize];
         HalfEdge {
             sphere: self.sphere.clone(),
@@ -448,7 +448,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                 0 => {
                     return Self {
                         sphere,
-                        region: BaseRegion::new(edge.inside(), BaseRegionType::Edge0),
+                        region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE0),
                         u,
                         v: 0,
                     };
@@ -460,7 +460,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                         let v = sphere.c();
                         return Self {
                             sphere,
-                            region: BaseRegion::new(edge.inside(), BaseRegionType::Edge2),
+                            region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE2),
                             u,
                             v,
                         };
@@ -474,7 +474,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                 let v = sphere.c();
                 Self {
                     sphere,
-                    region: BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
+                    region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE0),
                     u,
                     v,
                 }
@@ -483,7 +483,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                 debug_assert!(comp.inside().owns_edge_2());
                 Self {
                     sphere,
-                    region: BaseRegion::new(comp.inside(), BaseRegionType::Edge2),
+                    region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE2),
                     u,
                     v: 0,
                 }
@@ -498,7 +498,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
         debug_assert_eq!(sphere.b(), sphere.c());
         Self {
             sphere,
-            region: BaseRegion::new(face, BaseRegionType::Interior),
+            region: BaseRegion::new(face, BaseRegionType::INTERIOR),
             u: 0,
             v: 0,
         }
@@ -509,7 +509,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
         if source.index() == 0 {
             Self {
                 sphere,
-                region: BaseRegion::new(source.owner(), BaseRegionType::Edge0),
+                region: BaseRegion::new(source.owner(), BaseRegionType::EDGE0),
                 u: 0,
                 v: 0,
             }
@@ -518,7 +518,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
             let v = sphere.c();
             Self {
                 sphere,
-                region: BaseRegion::new(source.owner(), BaseRegionType::Edge0),
+                region: BaseRegion::new(source.owner(), BaseRegionType::EDGE0),
                 u,
                 v,
             }
@@ -528,7 +528,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
     /// Determines whether this vertex corresponds to a [`BaseVertex`] and if so, returns it.
     pub fn as_base(&self) -> Option<BaseVertex> {
         match self.region.ty() {
-            BaseRegionType::Edge0 => {
+            BaseRegionType::EDGE0 => {
                 if self.u == 0 {
                     debug_assert_eq!(self.v, 0);
                     Some(self.region.owner().vertex(0))
@@ -539,7 +539,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                     None
                 }
             }
-            BaseRegionType::Edge2 => {
+            BaseRegionType::EDGE2 => {
                 if self.u == self.sphere.b() {
                     debug_assert_eq!(self.v, self.sphere.c());
                     Some(self.region.owner().vertex(2))
@@ -619,27 +619,39 @@ pub struct HalfEdge<Proj> {
 }
 
 /// Identifies a possible direction of a half-edge with respect to its [`BaseFace`].
-#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum HalfEdgeDir {
-    /// The +U direction.
-    Up = 0,
+#[repr(transparent)]
+pub(crate) struct HalfEdgeDir(u8);
 
-    /// The +V direction.
-    Vp = 1,
-
-    /// The -U/+V direction.
-    UnVp = 2,
-
-    /// The -U direction.
-    Un = 3,
-
-    /// The -V direction.
-    Vn = 4,
-
-    /// The +U/-V direction.
-    UpVn = 5,
+impl HalfEdgeDir {
+    pub const UP: Self = Self(0);
+    pub const VP: Self = Self(1);
+    pub const UNVP: Self = Self(2);
+    pub const UN: Self = Self(3);
+    pub const VN: Self = Self(4);
+    pub const UPVN: Self = Self(5);
+    
+    /// Constructs a [`HalfEdgeDir`] from the given index.
+    ///
+    /// This corresponds to an angle of `index * 60` degrees.
+    pub fn from_index(index: usize) -> Self {
+        assert!(index < 6, "index out of bounds: {}", index);
+        Self(index as u8)
+    }
+    
+    /// Converts this direction into a vector representation.
+    pub fn into_vec(self) -> [i32; 2] {
+        let u = (0x020100000102u64 >> (self.0 as usize * 8)) as u8 as i32 - 1;
+        let v = (0x000001020201u64 >> (self.0 as usize * 8)) as u8 as i32 - 1;
+        [u, v]
+    }
+    
+    /// Rotates this [`HalfEdgeDir`] counter-clockwise by `amount * 60` degrees.
+    pub fn rotate_ccw(self, amount: usize) -> Self {
+        Self(((self.0 as usize + amount) % 6) as u8)
+    }
 }
+
 
 impl<Proj> HalfEdge<Proj> {
     /// Attempts to construct a [`HalfEdge`] with the given properties, normalizing
@@ -725,7 +737,7 @@ impl<Proj> HalfEdge<Proj> {
     ) -> Self {
         if start_u == 0 {
             let c = sphere.c();
-            if dir > HalfEdgeDir::Up {
+            if dir > HalfEdgeDir::UP {
                 return Self::on_edge_u_boundary(
                     sphere,
                     bottom.prev().twin(),
@@ -737,9 +749,9 @@ impl<Proj> HalfEdge<Proj> {
         let n = sphere.b() - sphere.c();
         let in_region = if start_u >= n {
             debug_assert_eq!(start_u, n);
-            dir == HalfEdgeDir::UnVp
+            dir == HalfEdgeDir::UNVP
         } else {
-            dir < HalfEdgeDir::Un
+            dir < HalfEdgeDir::UN
         };
         if !in_region {
             let start_u = sphere.b() - start_u;
@@ -752,7 +764,7 @@ impl<Proj> HalfEdge<Proj> {
         };
         Self {
             sphere,
-            region: BaseRegion::new(bottom.inside(), BaseRegionType::Interior),
+            region: BaseRegion::new(bottom.inside(), BaseRegionType::INTERIOR),
             start_u,
             start_v,
             dir,
@@ -769,12 +781,12 @@ impl<Proj> HalfEdge<Proj> {
         dir: HalfEdgeDir,
     ) -> Self {
         debug_assert!(start_v > 0);
-        if dir >= HalfEdgeDir::Vn {
+        if dir >= HalfEdgeDir::VN {
             Self::on_edge_exclusive(sphere, edge, 0, start_v, dir)
         } else if start_v >= sphere.c() {
             debug_assert_eq!(start_v, sphere.c());
             Self::on_interior_boundary(sphere, edge, 0, dir)
-        } else if dir == HalfEdgeDir::Up {
+        } else if dir == HalfEdgeDir::UP {
             Self::on_edge_exclusive(sphere, edge, 0, start_v, dir)
         } else {
             Self::on_edge_u_boundary(sphere, edge.prev().twin(), start_v, dir.rotate_ccw(5))
@@ -793,15 +805,15 @@ impl<Proj> HalfEdge<Proj> {
         } else if start_u == 0 {
             let mut edge = edge;
             let mut dir = dir;
-            while dir > HalfEdgeDir::Up {
+            while dir > HalfEdgeDir::UP {
                 edge = edge.prev().twin();
                 dir = dir.rotate_ccw(5);
             }
-            Self::on_edge_exclusive(sphere, edge, 0, 0, HalfEdgeDir::Up)
-        } else if start_u == sphere.b() && dir == HalfEdgeDir::Up {
+            Self::on_edge_exclusive(sphere, edge, 0, 0, HalfEdgeDir::UP)
+        } else if start_u == sphere.b() && dir == HalfEdgeDir::UP {
             let c = sphere.c();
-            Self::on_edge_u_boundary(sphere, edge.twin().prev().twin(), c, HalfEdgeDir::UnVp)
-        } else if dir < HalfEdgeDir::Un {
+            Self::on_edge_u_boundary(sphere, edge.twin().prev().twin(), c, HalfEdgeDir::UNVP)
+        } else if dir < HalfEdgeDir::UN {
             Self::on_edge_exclusive(sphere, edge, start_u, 0, dir)
         } else if start_u <= sphere.c() {
             Self::on_edge_v_boundary(sphere, edge.twin().next(), start_u, dir.rotate_ccw(1))
@@ -825,7 +837,7 @@ impl<Proj> HalfEdge<Proj> {
             0 => {
                 return Self {
                     sphere,
-                    region: BaseRegion::new(edge.inside(), BaseRegionType::Edge0),
+                    region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE0),
                     start_u,
                     start_v,
                     dir,
@@ -838,7 +850,7 @@ impl<Proj> HalfEdge<Proj> {
                     let start_v = sphere.c() - start_v;
                     return Self {
                         sphere,
-                        region: BaseRegion::new(edge.inside(), BaseRegionType::Edge2),
+                        region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE2),
                         start_u,
                         start_v,
                         dir: dir.rotate_ccw(3),
@@ -853,7 +865,7 @@ impl<Proj> HalfEdge<Proj> {
             let start_v = sphere.c() - start_v;
             Self {
                 sphere,
-                region: BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
+                region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE0),
                 start_u,
                 start_v,
                 dir: dir.rotate_ccw(3),
@@ -863,7 +875,7 @@ impl<Proj> HalfEdge<Proj> {
             debug_assert!(comp.inside().owns_edge_2());
             Self {
                 sphere,
-                region: BaseRegion::new(comp.inside(), BaseRegionType::Edge2),
+                region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE2),
                 start_u,
                 start_v,
                 dir,
@@ -876,19 +888,19 @@ impl<Proj> HalfEdge<Proj> {
         if sphere.c() == 0 {
             // In this case, edge regions do not own any faces, and therefore no half-edges.
             let (start_u, start_v, dir) = match source.side_index() {
-                0 => (0, 0, HalfEdgeDir::Up),
-                1 => (sphere.b(), 0, HalfEdgeDir::UnVp),
-                _ => (0, sphere.b(), HalfEdgeDir::Vn),
+                0 => (0, 0, HalfEdgeDir::UP),
+                1 => (sphere.b(), 0, HalfEdgeDir::UNVP),
+                _ => (0, sphere.b(), HalfEdgeDir::VN),
             };
             Self {
                 sphere,
-                region: BaseRegion::new(source.inside(), BaseRegionType::Interior),
+                region: BaseRegion::new(source.inside(), BaseRegionType::INTERIOR),
                 start_u,
                 start_v,
                 dir,
             }
         } else {
-            Self::on_edge_exclusive(sphere, source, 0, 0, HalfEdgeDir::Up)
+            Self::on_edge_exclusive(sphere, source, 0, 0, HalfEdgeDir::UP)
         }
     }
 }
@@ -898,7 +910,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
     type Vertex = Vertex<Proj>;
 
     fn side_index(&self) -> usize {
-        self.dir as usize / 2
+        self.dir.0 as usize / 2
     }
 
     fn length(&self) -> f64 {
@@ -914,19 +926,20 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
 
     fn inside(&self) -> Face<Proj> {
         let (d_u, d_v) = match self.dir {
-            HalfEdgeDir::Up => (0, 0),
-            HalfEdgeDir::Vp => (0, 0),
-            HalfEdgeDir::UnVp => (-1, 0),
-            HalfEdgeDir::Un => (0, -1),
-            HalfEdgeDir::Vn => (0, -1),
-            HalfEdgeDir::UpVn => (1, -1),
+            HalfEdgeDir::UP => (0, 0),
+            HalfEdgeDir::VP => (0, 0),
+            HalfEdgeDir::UNVP => (-1, 0),
+            HalfEdgeDir::UN => (0, -1),
+            HalfEdgeDir::VN => (0, -1),
+            HalfEdgeDir::UPVN => (1, -1),
+            _ => unreachable!()
         };
         Face {
             sphere: self.sphere.clone(),
             region: self.region,
             u_0: self.start_u.wrapping_add_signed(d_u),
             v_0: self.start_v.wrapping_add_signed(d_v),
-            boundary_along_v: (self.dir as usize) % 2 == 1,
+            boundary_along_v: (self.dir.0 as usize) % 2 == 1,
         }
     }
 
@@ -969,41 +982,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
     }
 }
 
-impl HalfEdgeDir {
-    #[inline]
-    pub(crate) const fn from_u8(value: u8) -> Self {
-        unsafe { std::mem::transmute(value) }
-    }
-    /// Constructs a [`HalfEdgeDir`] from the given index.
-    ///
-    /// This corresponds to an angle of `index * 60` degrees.
-    pub fn from_index(index: usize) -> Self {
-        assert!(index < 6, "index out of bounds: {}", index);
-        Self::from_u8(index as u8)
-    }
-
-    /// Converts this direction into a vector representation.
-    pub fn into_vec(self) -> [i32; 2] {
-        let u = (0x020100000102u64 >> (self as usize * 8)) as u8 as i32 - 1;
-        let v = (0x000001020201u64 >> (self as usize * 8)) as u8 as i32 - 1;
-        [u, v]
-    }
-
-    /// Rotates this [`HalfEdgeDir`] counter-clockwise by `amount * 60` degrees.
-    pub fn rotate_ccw(self, amount: usize) -> Self {
-        let index = (self as usize + amount) % 6;
-        Self::from_u8(index as u8)
-    }
-}
-
 impl<Proj> TriSphere<Proj> {
     /// Gets the index of the first face which is owned by the given base region.
     fn base_face_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE0) as usize;
         let num_interior_regions_before =
-            face.index() + (region.ty() > BaseRegionType::Interior) as usize;
+            face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_edge_regions_before * self.num_faces_per_edge_region()
             + num_interior_regions_before * self.num_faces_per_interior_region()
     }
@@ -1013,11 +999,11 @@ impl<Proj> TriSphere<Proj> {
     fn base_vertex_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_owned_vertices_before = face.num_owned_vertices_before()
-            + (face.owns_vertex_1() && region.ty() > BaseRegionType::Edge0) as usize;
+            + (face.owns_vertex_1() && region.ty() > BaseRegionType::EDGE0) as usize;
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE0) as usize;
         let num_interior_regions_before =
-            face.index() + (region.ty() > BaseRegionType::Interior) as usize;
+            face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_owned_vertices_before
             + num_edge_regions_before * self.num_vertices_per_edge_region()
             + num_interior_regions_before * self.num_vertices_per_interior_region()
@@ -1180,7 +1166,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for VertexIter<Proj> {
                     self.u = 1;
                     continue;
                 } else if self.u <= self.u_end
-                    && self.region.ty() == BaseRegionType::Edge0
+                    && self.region.ty() == BaseRegionType::EDGE0
                     && self.region.owner().owns_vertex_1()
                 {
                     let res = Vertex {
@@ -1221,7 +1207,7 @@ pub(crate) struct BaseRegion(u8);
 impl BaseRegion {
     /// Constructs the [`BaseRegion`] for the given face and type.
     pub fn new(owner: BaseFace, ty: BaseRegionType) -> Self {
-        BaseRegion((owner.0 << 2) | (ty as u8))
+        BaseRegion((owner.0 << 2) | ty.0)
     }
 
     /// Gets the owner of this region.
@@ -1231,13 +1217,13 @@ impl BaseRegion {
 
     /// The general type of this [`BaseRegion`].
     pub fn ty(&self) -> BaseRegionType {
-        BaseRegionType::from_u8(self.0 & 0b11)
+        BaseRegionType(self.0 & 0b11)
     }
 
     /// Assuming that this region is for an edge, gets the edge corresponding to this region. The
     /// start of the returned edge is the origin of this region.
     pub fn as_edge(self) -> BaseHalfEdge {
-        if self.ty() == BaseRegionType::Edge0 {
+        if self.ty() == BaseRegionType::EDGE0 {
             self.owner().side(0)
         } else {
             self.owner().side(2).twin()
@@ -1255,35 +1241,26 @@ impl std::fmt::Debug for BaseRegion {
 }
 
 /// The general type of a [`BaseRegion`].
-#[repr(u8)]
+// #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum BaseRegionType {
-    /// Corresponds to the first edge of [`BaseRegion::owner`].
-    Edge0 = 0,
-
-    /// Corresponds to the interior of [`BaseRegion::owner`].
-    Interior = 1,
-
-    /// Corresponds to the third edge of [`BaseRegion::owner`].
-    Edge2 = 3,
-}
+#[repr(transparent)]
+pub(crate) struct BaseRegionType(u8);
 
 impl BaseRegionType {
-    #[inline]
-    pub(crate) const fn from_u8(value: u8) -> Self {
-        unsafe { std::mem::transmute(value) }
-    }
+    pub const EDGE0: Self = Self(0);
+    pub const INTERIOR: Self = Self(1);
+    pub const EDGE2: Self = Self(2);
     
     /// Indicates whether this region corresponds to an edge.
     pub fn is_edge(self) -> bool {
-        self != Self::Interior
+        self != Self::INTERIOR
     }
 }
 
 impl BaseTriSphere {
     /// Gets the first [`BaseRegion`] of this base shape.
     pub(crate) fn first_region(self) -> BaseRegion {
-        BaseRegion::new(self.face(0), BaseRegionType::Edge0)
+        BaseRegion::new(self.face(0), BaseRegionType::EDGE0)
     }
 
     /// Gets the [`BaseRegion`] after the given one.
@@ -1388,7 +1365,7 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
             let u = (u.max(0.0) as u32).min(b - 1);
             let v = (v.max(0.0) as u32).min(b - u - 1);
             debug_assert!(u + v < b);
-            return (BaseRegion::new(face, BaseRegionType::Interior), [u, v]);
+            return (BaseRegion::new(face, BaseRegionType::INTERIOR), [u, v]);
         }
         let coords = vec::sub(coords, self.p_0);
         let coords = vec::mul(coords, self.inv_linear_det);
@@ -1400,17 +1377,17 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
                 return if v >= 0.0 {
                     let v = v as u32;
                     debug_assert!(u + v < n);
-                    (BaseRegion::new(face, BaseRegionType::Interior), [u, v])
+                    (BaseRegion::new(face, BaseRegionType::INTERIOR), [u, v])
                 } else {
                     debug_assert!(u < b);
                     let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
-                    (BaseRegion::new(face, BaseRegionType::Edge0), [u, r_v])
+                    (BaseRegion::new(face, BaseRegionType::EDGE0), [u, r_v])
                 }
             } else {
                 let r_u = ((u + (v + c as f64)).max(0.0) as u32).min(b - 1);
                 let r_v = ((-u) as u32).min(c - 1);
                 if face.owns_edge_2() {
-                    return (BaseRegion::new(face, BaseRegionType::Edge2), [r_u, r_v]);
+                    return (BaseRegion::new(face, BaseRegionType::EDGE2), [r_u, r_v]);
                 } else {
                     (face.side(2).twin(), [r_u, r_v])
                 }
@@ -1422,18 +1399,18 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
         } else {
             let r_u = (u as u32).min(b - 1);
             let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
-            return (BaseRegion::new(face, BaseRegionType::Edge0), [r_u, r_v]);
+            return (BaseRegion::new(face, BaseRegionType::EDGE0), [r_u, r_v]);
         };
         if comp.side_index() == 0 {
             (
-                BaseRegion::new(comp.inside(), BaseRegionType::Edge0),
+                BaseRegion::new(comp.inside(), BaseRegionType::EDGE0),
                 [r_u, r_v],
             )
         } else {
             debug_assert_eq!(comp.side_index(), 2);
             debug_assert!(comp.inside().owns_edge_2());
             (
-                BaseRegion::new(comp.inside(), BaseRegionType::Edge2),
+                BaseRegion::new(comp.inside(), BaseRegionType::EDGE2),
                 [b - r_u - 1, c - r_v - 1],
             )
         }

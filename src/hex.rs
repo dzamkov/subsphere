@@ -488,11 +488,11 @@ impl<Proj> HexSphere<Proj> {
     fn base_face_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_owned_vertices_before = face.num_owned_vertices_before()
-            + (face.owns_vertex_1() && region.ty() > BaseRegionType::Edge0) as usize;
+            + (face.owns_vertex_1() && region.ty() > BaseRegionType::EDGE0) as usize;
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE0) as usize;
         let num_interior_regions_before =
-            face.index() + (region.ty() > BaseRegionType::Interior) as usize;
+            face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_owned_vertices_before
             + num_edge_regions_before * self.num_faces_per_edge_region()
             + num_interior_regions_before * self.num_faces_per_interior_region()
@@ -502,9 +502,9 @@ impl<Proj> HexSphere<Proj> {
     fn base_vertex_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE0) as usize;
         let num_interior_regions_before =
-            face.index() + (region.ty() > BaseRegionType::Interior) as usize;
+            face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_edge_regions_before * self.num_vertices_per_edge_region()
             + num_interior_regions_before * self.num_vertices_per_interior_region()
     }
@@ -575,7 +575,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
                     self.u = 1 + (self.v + 2) % 3;
                     continue;
                 } else if self.u <= self.u_end
-                    && self.region.ty() == BaseRegionType::Edge0
+                    && self.region.ty() == BaseRegionType::EDGE0
                     && self.region.owner().owns_vertex_1()
                 {
                     let res = Face::from_center(tri::Vertex {
