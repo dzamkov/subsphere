@@ -429,7 +429,7 @@ struct OwnershipInfo {
 }
 
 /// Provides information about the "ownership" relationships between faces, edges, and vertices.
-static OWNERSHIP: OwnershipInfo = const {
+const OWNERSHIP: OwnershipInfo = const {
     // Assign ownership of first vertex in each shape
     let mut vert_owner: [Face; NUM_VERTS] = [Face(u8::MAX); NUM_VERTS];
     vert_owner[0] = Face(0);
@@ -504,7 +504,7 @@ static OWNERSHIP: OwnershipInfo = const {
 };
 
 /// Table used to implement [`crate::HalfEdge::twin`].
-static TWIN: [[HalfEdge; 3]; NUM_FACES] = const {
+const TWIN: [[HalfEdge; 3]; NUM_FACES] = const {
     // Build adjacent mapping for potential edges
     let mut adjacent: [[u8; NUM_VERTS]; NUM_VERTS] = [[u8::MAX; NUM_VERTS]; NUM_VERTS];
     let mut i = 0;
@@ -564,7 +564,7 @@ const fn icosa_point_index(point: [f64; 3]) -> u8 {
 ///
 /// For indices that don't correspond exactly to a face, this will provide an arbitrary
 /// nearby [`Face`].
-static ICOSA_FACE_AT: [Face; 243] = const {
+const ICOSA_FACE_AT: [Face; 243] = const {
     let mut res = [Face(u8::MAX); 243];
 
     // Assign each face to its proper index
@@ -647,7 +647,7 @@ const NUM_VERTS: usize = 12 + 6;
 const NUM_FACES: usize = 20 + 8;
 
 /// The vertex position data for all potential vertices on a [`BaseTriSphere`].
-static VERTS: [[f64; 3]; NUM_VERTS] = [
+const VERTS: [[f64; 3]; NUM_VERTS] = [
     // Icosahedron top apex
     [0.0, 0.0, 1.0],
     // Icosahedron top ring
@@ -674,7 +674,7 @@ static VERTS: [[f64; 3]; NUM_VERTS] = [
 ];
 
 /// The face index data for all potential faces on a [`BaseTriSphere`].
-static INDICES: [[u8; 3]; NUM_FACES] = [
+const INDICES: [[u8; 3]; NUM_FACES] = [
     // Icosahedron top cap
     [0, 1, 2],
     [0, 2, 3],
