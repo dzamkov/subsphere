@@ -20,8 +20,9 @@ pub enum BaseTriSphere {
 impl BaseTriSphere {
     #[inline]
     pub(crate) const fn from_u8(value: u8) -> Self {
-        unsafe { std::mem::transmute(value) }
+        [ Self::Icosa, Self::Octa, Self::Tetra ][value as usize]
     }
+    
     /// The degree of the vertices in this base shape.
     pub const fn vertex_degree(self) -> usize {
         self.lookup::<5, 4, 3>() as usize
