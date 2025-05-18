@@ -1249,7 +1249,7 @@ pub(crate) struct BaseRegionType(u8);
 impl BaseRegionType {
     pub const EDGE0: Self = Self(0);
     pub const INTERIOR: Self = Self(1);
-    pub const EDGE2: Self = Self(2);
+    pub const EDGE2: Self = Self(3);
     
     /// Indicates whether this region corresponds to an edge.
     pub fn is_edge(self) -> bool {
