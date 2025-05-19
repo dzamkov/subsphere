@@ -338,29 +338,36 @@ pub mod fuller {
                 3.0 * den_u * den_v - 8.0 * p - 2.0 * t_alpha * s,
                 t_alpha * den_u * den_v + 2.0 * s,
             )
-            .map(|t_x| {
-                // There may be up to three solutions to the cubic equation, but only one
-                // corresponds to the correct projection solution. This is the unique solution
-                // which satisfies:
-                //   * `-self.full_angle / 2.0 <= x <= self.full_angle / 2.0`
-                //   * `-self.full_angle / 2.0 <= x + proj_u <= self.full_angle / 2.0`
-                //   * `-self.full_angle / 2.0 <= x + proj_v <= self.full_angle / 2.0`
-                //
-                // or equivalently:
-                //   * `-t_alpha <= tan(x) <= t_alpha`
-                //   * `-t_alpha <= tan(x + proj_u) <= t_alpha`
-                //   * `-t_alpha <= tan(x + proj_v) <= t_alpha`
-
-                // Assuming there is exactly one such solution, it will be the one with the
-                // smallest `max(|tan(x)|, |tan(x + proj_u)|, |tan(x + proj_v)|)`
-                let t_x_proj_u =
-                    (den_u + 2.0 * t_half_proj_u) / (den_u - 2.0 * t_x * t_half_proj_u);
-                let t_x_proj_v =
-                    (den_v + 2.0 * t_half_proj_v) / (den_v - 2.0 * t_x * t_half_proj_v);
-                (t_x, t_x.abs().max(t_x_proj_u.abs()).max(t_x_proj_v.abs()))
-            })
+                .into_iter()
+                .filter_map(|root| {
+                    match root {
+                        Some(t_x) => {
+                            // There may be up to three solutions to the cubic equation, but only one
+                            // corresponds to the correct projection solution. This is the unique solution
+                            // which satisfies:
+                            //   * `-self.full_angle / 2.0 <= x <= self.full_angle / 2.0`
+                            //   * `-self.full_angle / 2.0 <= x + proj_u <= self.full_angle / 2.0`
+                            //   * `-self.full_angle / 2.0 <= x + proj_v <= self.full_angle / 2.0`
+                            //
+                            // or equivalently:
+                            //   * `-t_alpha <= tan(x) <= t_alpha`
+                            //   * `-t_alpha <= tan(x + proj_u) <= t_alpha`
+                            //   * `-t_alpha <= tan(x + proj_v) <= t_alpha`
+                            
+                            // Assuming there is exactly one such solution, it will be the one with the
+                            // smallest `max(|tan(x)|, |tan(x + proj_u)|, |tan(x + proj_v)|)`
+                            let t_x_proj_u =
+                                (den_u + 2.0 * t_half_proj_u) / (den_u - 2.0 * t_x * t_half_proj_u);
+                            let t_x_proj_v =
+                                (den_v + 2.0 * t_half_proj_v) / (den_v - 2.0 * t_x * t_half_proj_v);
+                            Some((t_x, t_x.abs().max(t_x_proj_u.abs()).max(t_x_proj_v.abs())))
+                        },
+                        None => None
+                    }
+                })
             .min_by(|(_, a), (_, b)| a.abs().partial_cmp(&b.abs()).unwrap())
             .unwrap();
+            
             let x = t_x.atan();
 
             // Use the solution to compute angle offsets of two planes from the second and

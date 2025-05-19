@@ -129,73 +129,120 @@ pub(crate) mod mat {
         [[d, -b], [-c, a]]
     }
 }
+const SMALL: f64 = 1.0e-6;
 
-/// Determines the real roots of a cubic polynomial of the form `a x³ + b x² + c x + d`.
-pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> impl Iterator<Item = f64> {
-    // Handle quadratic case explicitly.
-    const SMALL: f64 = 1.0e-6;
-    // TODO: This is pretty hacky. Is there a numerically stable continuation of the cubic
-    // formula for small leading coefficients?
+const fn solve_linear(a: f64, b: f64) -> Option<f64> {
+    if a.abs() <= SMALL {
+        None
+    } else {
+        Some(-b / a)
+    }
+}
+
+fn solve_quadratic(a: f64, b: f64, c: f64) -> [Option<f64>; 2] {
     if a.abs() < SMALL {
-        let disc = c * c - 4.0 * b * d;
-        return if disc >= 0.0 {
-            let u = -c - c.signum() * disc.sqrt();
-            let mut iter = [0.0, u / (2.0 * b), 2.0 * d / u].into_iter();
-            iter.next().unwrap();
-            if b.abs() < SMALL {
-                iter.next().unwrap();
-            }
-            iter
+        [ solve_linear(b, c), None ]
+    } else {
+        let disc = b * b - 4.0 * a * c;
+        
+        if disc.abs() < SMALL {
+            [ Some(-b / (2.0 * a)), None ]
+        } else if disc < 0.0 {
+            [ None, None ]
         } else {
-            let mut iter = [0.0, 0.0, 0.0].into_iter();
-            iter.next().unwrap();
-            iter.next().unwrap();
-            iter.next().unwrap();
-            iter
+            if b.abs() < SMALL {
+                [ Some(c.abs().sqrt()), Some(-c.abs().sqrt()) ]
+            } else {
+                let u = -b - b.signum() * disc.sqrt();
+                [ Some(2.0 * c / u), Some(u / (2.0 * a)) ]
+            }
         }
     }
+}
 
-    // See https://mathworld.wolfram.com/CubicFormula.html for derivation
-    let b_i_3a = (b / 3.0) / a;
-    let c_i_a = c / a;
-    let d_i_a = d / a;
-
-    // Let `x = t - b / 3 a`. Then the equation becomes `t³ + 3 q t - 2 r = 0` where:
-    let q = c_i_a / 3.0 - b_i_3a * b_i_3a;
-    let r = (b_i_3a * c_i_a - d_i_a) / 2.0 - b_i_3a * b_i_3a * b_i_3a;
-    let disc = q * q * q + r * r;
-    if disc >= 0.0 {
-        // Equation has one real
-        let w = (r + disc.sqrt()).cbrt();
-        let t = w - q / w;
-        let mut iter = [0.0, 0.0, t - b_i_3a].into_iter();
-        iter.next().unwrap();
-        iter.next().unwrap();
-        iter
+/// Determines the real roots of a cubic polynomial of the form `a x³ + b x² + c x + d`. IF a root has multiplicity
+/// greater than one, it will only appear once in the output.
+pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> [Option<f64>; 3] {
+    if a.abs() < SMALL {
+        let roots = solve_quadratic(b, c, d);
+        
+        [ roots[0], roots[1], None ]
+    } else if d.abs() < SMALL {
+        let roots = solve_quadratic(a, b, c);
+        
+        [ Some(0.0), roots[0], roots[1] ]
     } else {
-        // Equation has three real roots
-        let h = (r * r - disc).sqrt();
-        let s_r = h.cbrt();
-        // TODO: Evaluation of `acos` and `cos` shouldn't actually be necessary here.
-        let s_theta_0 = (r / h).acos() / 3.0;
-        let t_0 = 2.0 * s_r * (s_theta_0 + 2.0 * PI / 3.0).cos();
-        let x_0 = t_0 - b_i_3a;
-        let t_1 = 2.0 * s_r * (s_theta_0 - 2.0 * PI / 3.0).cos();
-        let x_1 = t_1 - b_i_3a;
-        let t_2 = 2.0 * s_r * s_theta_0.cos();
-        let x_2 = t_2 - b_i_3a;
-        [x_0, x_1, x_2].into_iter()
+        let b2 = b * b;
+        let a2 = a * a;
+        let c2 = c * c;
+        let ac = a * c;
+        let bd = b * d;
+        let disc = b2 * c2 - 4.0 * ac * c2 - 4.0 * b2 * bd - 27.0 * a2 * d * d + 18.0 * ac * bd;
+        
+        // https://en.wikipedia.org/wiki/Cubic_equation#Depressed_cubic
+        if disc.abs() < SMALL {
+            // Two roots are equal
+            if (b2 - 3.0 * ac).abs() < SMALL {
+                // Triple root
+                [ Some(-b / (3.0 * a)), None, None ]
+            } else {
+                // Double root
+                [
+                    Some((4.0 * ac * b - 9.0 * a2 * d - b2 * b) / (a * (b2 - 3.0 * ac))),
+                    Some((9.0 * a * d - b * c) / (2.0 * (b2 - 3.0 * ac))),
+                    None
+                ]
+            }
+        } else {
+            let p = (3.0 * ac - b2) / (3.0 * a2);
+            let q = (2.0 * b2 * b - 9.0 * ac * b + 27.0 * a2 * d) / (27.0 * a2 * a);
+            let s = b / (3.0 * a);
+            
+            if p.abs() < SMALL {
+                [ Some((-q).cbrt() - s), None, None ]
+            } else {
+                if disc > 0.0 {
+                    // Three distinct real roots
+                    let x = 3.0 * q / (2.0 * p) * (-3.0 / p).sqrt();
+                    let acos = x.acos() / 3.0;
+                    let k = 2.0 * (-p / 3.0).sqrt();
+                    let t = [
+                        // Unfortunately, it's not possible to reduce this except by solving a second cubic.
+                        k * acos.cos(),
+                        k * (acos - 2.0 * PI / 3.0).cos(),
+                        k * (acos - 4.0 * PI / 3.0).cos(),
+                    ];
+                    
+                    [ Some(t[0] - s), Some(t[1] - s), Some(t[2] - s) ]
+                } else {
+                    // One real root, two conjugate complex root
+                    if p > 0.0 {
+                        [
+                            Some(-2.0 * (p / 3.0).sqrt() * (((3.0 * q) / (2.0 * p) * (3.0 / p).sqrt()).asinh() / 3.0).sinh() - s),
+                            None,
+                            None
+                        ]
+                    } else {
+                        [
+                            Some(-2.0 * q.signum() * (-p / 3.0).sqrt() * ((-3.0 * q.abs() / (2.0 * p) * (-3.0 / p).sqrt()).acosh() / 3.0).cosh() - s),
+                            None,
+                            None
+                        ]
+                    }
+                }
+            }
+        }
     }
 }
 
 #[test]
 fn test_solve_cubic() {
     // Cubic cases
-    assert_similar(solve_cubic(1.0, -1.0, 1.0, -1.0).collect(), [1.0]);
-    assert_similar(solve_cubic(1.0, 0.0, 0.0, -27.0).collect(), [3.0]);
-    assert_similar(solve_cubic(8.0, 8.0, 0.0, -3.0).collect(), [0.5]);
+    assert_similar(solve_cubic(1.0, -1.0, 1.0, -1.0).into_iter().filter_map(|a| a).collect(), [1.0]);
+    assert_similar(solve_cubic(1.0, 0.0, 0.0, -27.0).into_iter().filter_map(|a| a).collect(), [3.0]);
+    assert_similar(solve_cubic(8.0, 8.0, 0.0, -3.0).into_iter().filter_map(|a| a).collect(), [0.5]);
     assert_similar(
-        solve_cubic(1.0, 4.0, 0.0, -5.0).collect(),
+        solve_cubic(1.0, 4.0, 0.0, -5.0).into_iter().filter_map(|a| a).collect(),
         [
             -(5.0f64.sqrt() + 5.0) / 2.0,
             (5.0f64.sqrt() - 5.0) / 2.0,
@@ -203,7 +250,7 @@ fn test_solve_cubic() {
         ],
     );
     assert_similar(
-        solve_cubic(1.0, -2.0, 0.0, 1.0).collect(),
+        solve_cubic(1.0, -2.0, 0.0, 1.0).into_iter().filter_map(|a| a).collect(),
         [
             (1.0 - 5.0f64.sqrt()) / 2.0,
             1.0,
@@ -212,16 +259,18 @@ fn test_solve_cubic() {
     );
 
     // Quadratic cases
-    assert_similar(solve_cubic(0.0, 1.0, 0.0, -1.0).collect(), [-1.0, 1.0]);
-    assert_similar(solve_cubic(0.0, 1.0, 0.0, 1.0).collect(), []);
+    assert_similar(solve_cubic(0.0, 1.0, 0.0, -1.0).into_iter().filter_map(|a| a).collect(), [-1.0, 1.0]);
+    assert_similar(solve_cubic(0.0, 1.0, 0.0, 1.0).into_iter().filter_map(|a| a).collect(), []);
 
     // Linear cases
-    assert_similar(solve_cubic(0.0, 0.0, 1.0, -1.0).collect(), [1.0]);
+    assert_similar(solve_cubic(0.0, 0.0, 1.0, -1.0).into_iter().filter_map(|a| a).collect(), [1.0]);
 }
 
 #[cfg(test)]
-fn assert_similar<const N: usize>(a: Vec<f64>, b: [f64; N]) {
-    if a.len() != b.len() || a.iter().zip(b.iter()).any(|(x, y)| (x - y).abs() > 1e-6) {
+fn assert_similar<const N: usize>(mut a: Vec<f64>, mut b: [f64; N]) {
+    a.sort_by(|u, v| u.partial_cmp(v).unwrap());
+    b.sort_by(|u, v| u.partial_cmp(v).unwrap());
+    if a.len() != b.len() || a.iter().zip(b.iter()).any(|(x, y)| (x - y).abs() > SMALL) {
         panic!("vectors are not similar, a = {:?}, b = {:?}", a, b);
     }
 }
