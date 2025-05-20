@@ -448,7 +448,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                 0 => {
                     return Self {
                         sphere,
-                        region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE0),
+                        region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE_0),
                         u,
                         v: 0,
                     };
@@ -460,7 +460,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                         let v = sphere.c();
                         return Self {
                             sphere,
-                            region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE2),
+                            region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE_2),
                             u,
                             v,
                         };
@@ -474,7 +474,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                 let v = sphere.c();
                 Self {
                     sphere,
-                    region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE0),
+                    region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE_0),
                     u,
                     v,
                 }
@@ -483,7 +483,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                 debug_assert!(comp.inside().owns_edge_2());
                 Self {
                     sphere,
-                    region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE2),
+                    region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE_2),
                     u,
                     v: 0,
                 }
@@ -509,7 +509,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
         if source.index() == 0 {
             Self {
                 sphere,
-                region: BaseRegion::new(source.owner(), BaseRegionType::EDGE0),
+                region: BaseRegion::new(source.owner(), BaseRegionType::EDGE_0),
                 u: 0,
                 v: 0,
             }
@@ -518,7 +518,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
             let v = sphere.c();
             Self {
                 sphere,
-                region: BaseRegion::new(source.owner(), BaseRegionType::EDGE0),
+                region: BaseRegion::new(source.owner(), BaseRegionType::EDGE_0),
                 u,
                 v,
             }
@@ -528,7 +528,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
     /// Determines whether this vertex corresponds to a [`BaseVertex`] and if so, returns it.
     pub fn as_base(&self) -> Option<BaseVertex> {
         match self.region.ty() {
-            BaseRegionType::EDGE0 => {
+            BaseRegionType::EDGE_0 => {
                 if self.u == 0 {
                     debug_assert_eq!(self.v, 0);
                     Some(self.region.owner().vertex(0))
@@ -539,7 +539,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Vertex<Proj> {
                     None
                 }
             }
-            BaseRegionType::EDGE2 => {
+            BaseRegionType::EDGE_2 => {
                 if self.u == self.sphere.b() {
                     debug_assert_eq!(self.v, self.sphere.c());
                     Some(self.region.owner().vertex(2))
@@ -843,7 +843,7 @@ impl<Proj> HalfEdge<Proj> {
             0 => {
                 return Self {
                     sphere,
-                    region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE0),
+                    region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE_0),
                     start_u,
                     start_v,
                     dir,
@@ -856,7 +856,7 @@ impl<Proj> HalfEdge<Proj> {
                     let start_v = sphere.c() - start_v;
                     return Self {
                         sphere,
-                        region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE2),
+                        region: BaseRegion::new(edge.inside(), BaseRegionType::EDGE_2),
                         start_u,
                         start_v,
                         dir: dir.rotate_ccw(3),
@@ -871,7 +871,7 @@ impl<Proj> HalfEdge<Proj> {
             let start_v = sphere.c() - start_v;
             Self {
                 sphere,
-                region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE0),
+                region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE_0),
                 start_u,
                 start_v,
                 dir: dir.rotate_ccw(3),
@@ -881,7 +881,7 @@ impl<Proj> HalfEdge<Proj> {
             debug_assert!(comp.inside().owns_edge_2());
             Self {
                 sphere,
-                region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE2),
+                region: BaseRegion::new(comp.inside(), BaseRegionType::EDGE_2),
                 start_u,
                 start_v,
                 dir,
@@ -993,7 +993,7 @@ impl<Proj> TriSphere<Proj> {
     fn base_face_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE_0) as usize;
         let num_interior_regions_before =
             face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_edge_regions_before * self.num_faces_per_edge_region()
@@ -1005,9 +1005,9 @@ impl<Proj> TriSphere<Proj> {
     fn base_vertex_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_owned_vertices_before = face.num_owned_vertices_before()
-            + (face.owns_vertex_1() && region.ty() > BaseRegionType::EDGE0) as usize;
+            + (face.owns_vertex_1() && region.ty() > BaseRegionType::EDGE_0) as usize;
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE_0) as usize;
         let num_interior_regions_before =
             face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_owned_vertices_before
@@ -1172,7 +1172,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for VertexIter<Proj> {
                     self.u = 1;
                     continue;
                 } else if self.u <= self.u_end
-                    && self.region.ty() == BaseRegionType::EDGE0
+                    && self.region.ty() == BaseRegionType::EDGE_0
                     && self.region.owner().owns_vertex_1()
                 {
                     let res = Vertex {
@@ -1229,7 +1229,7 @@ impl BaseRegion {
     /// Assuming that this region is for an edge, gets the edge corresponding to this region. The
     /// start of the returned edge is the origin of this region.
     pub fn as_edge(self) -> BaseHalfEdge {
-        if self.ty() == BaseRegionType::EDGE0 {
+        if self.ty() == BaseRegionType::EDGE_0 {
             self.owner().side(0)
         } else {
             self.owner().side(2).twin()
@@ -1253,9 +1253,12 @@ impl std::fmt::Debug for BaseRegion {
 pub(crate) struct BaseRegionType(u8);
 
 impl BaseRegionType {
-    pub const EDGE0: Self = Self(0);
+    /// Corresponds to the first edge of [`BaseRegion::owner`].
+    pub const EDGE_0: Self = Self(0);
+    /// Corresponds to the interior of [`BaseRegion::owner`].
     pub const INTERIOR: Self = Self(1);
-    pub const EDGE2: Self = Self(3);
+    /// Corresponds to the third edge of [`BaseRegion::owner`].
+    pub const EDGE_2: Self = Self(3);
     
     /// Indicates whether this region corresponds to an edge.
     pub fn is_edge(self) -> bool {
@@ -1266,7 +1269,7 @@ impl BaseRegionType {
 impl BaseTriSphere {
     /// Gets the first [`BaseRegion`] of this base shape.
     pub(crate) fn first_region(self) -> BaseRegion {
-        BaseRegion::new(self.face(0), BaseRegionType::EDGE0)
+        BaseRegion::new(self.face(0), BaseRegionType::EDGE_0)
     }
 
     /// Gets the [`BaseRegion`] after the given one.
@@ -1387,13 +1390,13 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
                 } else {
                     debug_assert!(u < b);
                     let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
-                    (BaseRegion::new(face, BaseRegionType::EDGE0), [u, r_v])
+                    (BaseRegion::new(face, BaseRegionType::EDGE_0), [u, r_v])
                 }
             } else {
                 let r_u = ((u + (v + c as f64)).max(0.0) as u32).min(b - 1);
                 let r_v = ((-u) as u32).min(c - 1);
                 if face.owns_edge_2() {
-                    return (BaseRegion::new(face, BaseRegionType::EDGE2), [r_u, r_v]);
+                    return (BaseRegion::new(face, BaseRegionType::EDGE_2), [r_u, r_v]);
                 } else {
                     (face.side(2).twin(), [r_u, r_v])
                 }
@@ -1405,18 +1408,18 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
         } else {
             let r_u = (u as u32).min(b - 1);
             let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
-            return (BaseRegion::new(face, BaseRegionType::EDGE0), [r_u, r_v]);
+            return (BaseRegion::new(face, BaseRegionType::EDGE_0), [r_u, r_v]);
         };
         if comp.side_index() == 0 {
             (
-                BaseRegion::new(comp.inside(), BaseRegionType::EDGE0),
+                BaseRegion::new(comp.inside(), BaseRegionType::EDGE_0),
                 [r_u, r_v],
             )
         } else {
             debug_assert_eq!(comp.side_index(), 2);
             debug_assert!(comp.inside().owns_edge_2());
             (
-                BaseRegion::new(comp.inside(), BaseRegionType::EDGE2),
+                BaseRegion::new(comp.inside(), BaseRegionType::EDGE_2),
                 [b - r_u - 1, c - r_v - 1],
             )
         }
