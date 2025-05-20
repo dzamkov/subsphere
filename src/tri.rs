@@ -56,6 +56,7 @@ impl<Proj> TriSphere<Proj> {
 
     /// The base shape of this subdivided sphere.
     pub const fn base(&self) -> BaseTriSphere {
+        // SAFETY:
         // Directly converting from `u8` to `BaseTriSphere` with `std::mem::transmute` is the fastest way to retrieve
         // the base sphere. The input to `transmute` is guaranteed to be valid as long as other parts of the library use
         // provided methods on `TriSphere` for modifying `base` and do not directly modify the `c_base` field.

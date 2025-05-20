@@ -129,12 +129,14 @@ pub struct Face(pub(crate) u8);
 impl Face {
     /// Gets the [`BaseTriSphere`] this face belongs to.
     pub const fn sphere(self) -> BaseTriSphere {
+        // SAFETY:
         // Subtracting 12 and dividing by 8 are very cheap (second operation will be converted to a bitshift) so
         // converting this to provably safe code (e.g. `if` statements to determine `BaseTriSphere` variant) will incur
         // a performance penalty.
-        // Input to `std::mem::transmute` will be valid as long as `self.0` is less than or equal to 28. Since this
-        // struct represents a face of a triangular Platonic solid, which can never have more than 20 faces, the input
-        // will always be valid unless `Face` was constructed incorrectly somewhere else.
+        // Input to `std::mem::transmute` must be less than or equal to 2 so the input will be valid as long as the
+        // input is less than or equal to 35. Platonic solid share the same index space to avoid branching (0..20
+        // icosahedron, 20..28 octahedron, and 28..32 tetrahedron) meaning that the maximum value of `self.0` is 31 when
+        // constructed correctly, which is within the valid range. 
         unsafe { std::mem::transmute(self.0.saturating_sub(12) / 8) }
     }
 

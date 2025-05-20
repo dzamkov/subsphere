@@ -216,13 +216,6 @@ pub struct Face<Proj> {
 }
 
 impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
-    /// Unchecked variant of [from_center](Face::from_center).
-    pub fn from_center_unchecked(center: tri::Vertex<Proj>) -> Self {
-        debug_assert_eq!(center.sphere.b() % 3, center.sphere.c() % 3, "Sphere b and c parameters must be congruent mod 3.");
-        debug_assert_eq!(center.u % 3, center.adjusted_v() % 3, "Vertex u and adjusted v must be congruent mod 3.");
-        Self { center }
-    }
-    
     /// Gets the hexsphere face whose central vertex, in the [kised](HexSphere::kis) [`TriSphere`],
     /// is the given [`Vertex`](tri::Vertex).
     ///
@@ -246,26 +239,6 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
         }
         Some(Self { center })
     }
-    
-    /// Unchecked variant of [from_kis](Face::from_kis).
-    pub fn from_kis_unchecked(kis: tri::Face<Proj>) -> Self {
-        debug_assert_eq!(kis.sphere.b() % 3, kis.sphere.c() % 3, "Kis b and c parameters must be congruent mod 3.");
-        
-        let adj_v = if !kis.region.ty().is_edge() {
-            kis.sphere.c()
-        } else {
-            0
-        };
-        
-        let [u, v] = match ((kis.u_0 + 2 * (kis.v_0 + adj_v)) % 3, kis.boundary_along_v) {
-            (0, _) => [kis.u_0, kis.v_0],
-            (1, _) => [kis.u_0, kis.v_0 + 1],
-            (_, false) => [kis.u_0 + 1, kis.v_0],
-            (_, true) => [kis.u_0 - 1, kis.v_0 + 1],
-        };
-        
-        Self::from_center_unchecked(tri::Vertex::new(kis.sphere, kis.region, u, v))
-    }
 
     /// Gets the hexsphere face which, when [kised](HexSphere::kis), produces the given
     /// triangular [`Face`](tri::Face).
@@ -287,6 +260,33 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
         }
         
         Some(Self::from_kis_unchecked(kis))
+    }
+    
+    /// Unchecked variant of [from_center](Face::from_center).
+    fn from_center_unchecked(center: tri::Vertex<Proj>) -> Self {
+        debug_assert_eq!(center.sphere.b() % 3, center.sphere.c() % 3, "Sphere b and c parameters must be congruent mod 3.");
+        debug_assert_eq!(center.u % 3, center.adjusted_v() % 3, "Vertex u and adjusted v must be congruent mod 3.");
+        Self { center }
+    }
+    
+    /// Unchecked variant of [from_kis](Face::from_kis).
+    fn from_kis_unchecked(kis: tri::Face<Proj>) -> Self {
+        debug_assert_eq!(kis.sphere.b() % 3, kis.sphere.c() % 3, "Kis b and c parameters must be congruent mod 3.");
+        
+        let adj_v = if !kis.region.ty().is_edge() {
+            kis.sphere.c()
+        } else {
+            0
+        };
+        
+        let [u, v] = match ((kis.u_0 + 2 * (kis.v_0 + adj_v)) % 3, kis.boundary_along_v) {
+            (0, _) => [kis.u_0, kis.v_0],
+            (1, _) => [kis.u_0, kis.v_0 + 1],
+            (_, false) => [kis.u_0 + 1, kis.v_0],
+            (_, true) => [kis.u_0 - 1, kis.v_0 + 1],
+        };
+        
+        Self::from_center_unchecked(tri::Vertex::new(kis.sphere, kis.region, u, v))
     }
 
     /// The [`HexSphere`] that this [`Face`] belongs to.
