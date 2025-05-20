@@ -376,20 +376,20 @@ pub mod fuller {
             let a_1 = a_0 - (2.0 * u + v - 1.0) * self.angle;
 
             // Construct planes by offsetting the second and third edges of the triangle
-            let n_0 = vec::normalize(vec::cross(
+            let n_0 = vec::cross(
                 mat::apply(
                     [self.points[0], self.points[1]],
                     [(self.angle - a_0).sin(), a_0.sin()],
                 ),
                 vec::sub(self.points[2], self.points[1]),
-            ));
-            let n_1 = vec::normalize(vec::cross(
+            );
+            let n_1 = vec::cross(
                 mat::apply(
                     [self.points[1], self.points[2]],
                     [(self.angle - a_1).sin(), a_1.sin()],
                 ),
                 vec::sub(self.points[0], self.points[2]),
-            ));
+            );
 
             // The projected point is the intersection of the two planes
             vec::normalize(vec::cross(n_0, n_1))
