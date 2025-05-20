@@ -166,7 +166,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for TriSphere<Proj> {
             region,
             start_u: u + 1,
             start_v: v,
-            dir: HalfEdgeDir::UNVP,
+            dir: HalfEdgeDir::UN_VP,
         };
         if mat::det_3([point, v_0, v_1]) < 0.0 {
             std::mem::swap(&mut v_0, &mut v_1);
@@ -315,10 +315,10 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Face for Face<Proj> {
         let (d_u, d_v, dir) = [
             (0, 0, HalfEdgeDir::UP),
             (0, 0, HalfEdgeDir::VP),
-            (1, 0, HalfEdgeDir::UNVP),
+            (1, 0, HalfEdgeDir::UN_VP),
             (0, 1, HalfEdgeDir::UN),
             (0, 1, HalfEdgeDir::VN),
-            (-1, 1, HalfEdgeDir::UPVN),
+            (-1, 1, HalfEdgeDir::UP_VN),
         ][(index << 1) | self.boundary_along_v as usize];
         HalfEdge {
             sphere: self.sphere.clone(),
@@ -624,12 +624,18 @@ pub struct HalfEdge<Proj> {
 pub(crate) struct HalfEdgeDir(u8);
 
 impl HalfEdgeDir {
+    // The +U direction.
     pub const UP: Self = Self(0);
+    // The +V direction.
     pub const VP: Self = Self(1);
-    pub const UNVP: Self = Self(2);
+    // The -U/+V direction.
+    pub const UN_VP: Self = Self(2);
+    // The -U direction.
     pub const UN: Self = Self(3);
+    // The -V direction.
     pub const VN: Self = Self(4);
-    pub const UPVN: Self = Self(5);
+    // The +U/-V direction.
+    pub const UP_VN: Self = Self(5);
     
     /// Constructs a [`HalfEdgeDir`] from the given index.
     ///
@@ -749,7 +755,7 @@ impl<Proj> HalfEdge<Proj> {
         let n = sphere.b() - sphere.c();
         let in_region = if start_u >= n {
             debug_assert_eq!(start_u, n);
-            dir == HalfEdgeDir::UNVP
+            dir == HalfEdgeDir::UN_VP
         } else {
             dir < HalfEdgeDir::UN
         };
@@ -812,7 +818,7 @@ impl<Proj> HalfEdge<Proj> {
             Self::on_edge_exclusive(sphere, edge, 0, 0, HalfEdgeDir::UP)
         } else if start_u == sphere.b() && dir == HalfEdgeDir::UP {
             let c = sphere.c();
-            Self::on_edge_u_boundary(sphere, edge.twin().prev().twin(), c, HalfEdgeDir::UNVP)
+            Self::on_edge_u_boundary(sphere, edge.twin().prev().twin(), c, HalfEdgeDir::UN_VP)
         } else if dir < HalfEdgeDir::UN {
             Self::on_edge_exclusive(sphere, edge, start_u, 0, dir)
         } else if start_u <= sphere.c() {
@@ -889,7 +895,7 @@ impl<Proj> HalfEdge<Proj> {
             // In this case, edge regions do not own any faces, and therefore no half-edges.
             let (start_u, start_v, dir) = match source.side_index() {
                 0 => (0, 0, HalfEdgeDir::UP),
-                1 => (sphere.b(), 0, HalfEdgeDir::UNVP),
+                1 => (sphere.b(), 0, HalfEdgeDir::UN_VP),
                 _ => (0, sphere.b(), HalfEdgeDir::VN),
             };
             Self {
@@ -928,10 +934,10 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
         let (d_u, d_v) = match self.dir {
             HalfEdgeDir::UP => (0, 0),
             HalfEdgeDir::VP => (0, 0),
-            HalfEdgeDir::UNVP => (-1, 0),
+            HalfEdgeDir::UN_VP => (-1, 0),
             HalfEdgeDir::UN => (0, -1),
             HalfEdgeDir::VN => (0, -1),
-            HalfEdgeDir::UPVN => (1, -1),
+            HalfEdgeDir::UP_VN => (1, -1),
             _ => unreachable!()
         };
         Face {
