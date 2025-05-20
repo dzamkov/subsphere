@@ -51,7 +51,7 @@ impl<Proj> HexSphere<Proj> {
     }
 
     /// Replaces the projector of this sphere with the given one.
-    /// 
+    ///
     /// The resulting sphere will be topologically identical to this one, but the positions
     /// of the vertices will be changed according to the new projection.
     pub fn with_projector<NProj>(self, proj: NProj) -> HexSphere<NProj> {
@@ -186,7 +186,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
     }
 
     fn face_at(&self, point: [f64; 3]) -> Face<Proj> {
-        Face::from_kis(self.kis.face_at(point)).unwrap()
+        Face::from_kis_unchecked(self.kis.face_at(point))
     }
 
     fn num_vertices(&self) -> usize {
@@ -216,6 +216,13 @@ pub struct Face<Proj> {
 }
 
 impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
+    /// Unchecked variant of [from_center](Face::from_center).
+    pub fn from_center_unchecked(center: tri::Vertex<Proj>) -> Self {
+        debug_assert_eq!(center.sphere.b() % 3, center.sphere.c() % 3, "Sphere b and c parameters must be congruent mod 3.");
+        debug_assert_eq!(center.u % 3, center.adjusted_v() % 3, "Vertex u and adjusted v must be congruent mod 3.");
+        Self { center }
+    }
+    
     /// Gets the hexsphere face whose central vertex, in the [kised](HexSphere::kis) [`TriSphere`],
     /// is the given [`Vertex`](tri::Vertex).
     ///
@@ -239,6 +246,26 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
         }
         Some(Self { center })
     }
+    
+    /// Unchecked variant of [from_kis](Face::from_kis).
+    pub fn from_kis_unchecked(kis: tri::Face<Proj>) -> Self {
+        debug_assert_eq!(kis.sphere.b() % 3, kis.sphere.c() % 3, "Kis b and c parameters must be congruent mod 3.");
+        
+        let adj_v = if !kis.region.ty().is_edge() {
+            kis.sphere.c()
+        } else {
+            0
+        };
+        
+        let [u, v] = match ((kis.u_0 + 2 * (kis.v_0 + adj_v)) % 3, kis.boundary_along_v) {
+            (0, _) => [kis.u_0, kis.v_0],
+            (1, _) => [kis.u_0, kis.v_0 + 1],
+            (_, false) => [kis.u_0 + 1, kis.v_0],
+            (_, true) => [kis.u_0 - 1, kis.v_0 + 1],
+        };
+        
+        Self::from_center_unchecked(tri::Vertex::new(kis.sphere, kis.region, u, v))
+    }
 
     /// Gets the hexsphere face which, when [kised](HexSphere::kis), produces the given
     /// triangular [`Face`](tri::Face).
@@ -258,19 +285,8 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
         if kis.sphere.b() % 3 != kis.sphere.c() % 3 {
             return None;
         }
-        let adj_v = if !kis.region.ty().is_edge() {
-            kis.sphere.c()
-        } else {
-            0
-        };
-        let [u, v] = match ((kis.u_0 + 2 * (kis.v_0 + adj_v)) % 3, kis.boundary_along_v) {
-            (0, _) => [kis.u_0, kis.v_0],
-            (1, _) => [kis.u_0, kis.v_0 + 1],
-            (_, false) => [kis.u_0 + 1, kis.v_0],
-            (_, true) => [kis.u_0 - 1, kis.v_0 + 1],
-        };
         
-        Self::from_center(tri::Vertex::new(kis.sphere, kis.region, u, v))
+        Some(Self::from_kis_unchecked(kis))
     }
 
     /// The [`HexSphere`] that this [`Face`] belongs to.
@@ -561,14 +577,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
     fn next(&mut self) -> Option<Face<Proj>> {
         loop {
             if self.u < self.u_end {
-                let res = Face::from_center(tri::Vertex {
+                let res = Face::from_center_unchecked(tri::Vertex {
                     sphere: self.sphere.kis.clone(),
                     region: self.region,
                     u: self.u,
                     v: self.v,
                 });
                 self.u += 3;
-                return res;
+                return Some(res);
             } else if self.region.ty().is_edge() {
                 if self.v < self.sphere.kis.c() {
                     self.v += 1;
@@ -578,14 +594,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
                     && self.region.ty() == BaseRegionType::EDGE_0
                     && self.region.owner().owns_vertex_1()
                 {
-                    let res = Face::from_center(tri::Vertex {
+                    let res = Face::from_center_unchecked(tri::Vertex {
                         sphere: self.sphere.kis.clone(),
                         region: self.region,
                         u: self.u,
                         v: self.v,
                     });
                     self.u += 3;
-                    return res;
+                    return Some(res);
                 }
             } else {
                 let n = self.sphere.kis.b() - self.sphere.kis.c();
