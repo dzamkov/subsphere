@@ -624,17 +624,17 @@ pub struct HalfEdge<Proj> {
 pub(crate) struct HalfEdgeDir(u8);
 
 impl HalfEdgeDir {
-    // The +U direction.
+    /// The +U direction.
     pub const UP: Self = Self(0);
-    // The +V direction.
+    /// The +V direction.
     pub const VP: Self = Self(1);
-    // The -U/+V direction.
+    /// The -U/+V direction.
     pub const UN_VP: Self = Self(2);
-    // The -U direction.
+    /// The -U direction.
     pub const UN: Self = Self(3);
-    // The -V direction.
+    /// The -V direction.
     pub const VN: Self = Self(4);
-    // The +U/-V direction.
+    /// The +U/-V direction.
     pub const UP_VN: Self = Self(5);
     
     /// Constructs a [`HalfEdgeDir`] from the given index.
