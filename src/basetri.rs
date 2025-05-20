@@ -226,7 +226,13 @@ pub struct Vertex(u8);
 impl Vertex {
     /// Gets the [`BaseTriSphere`] this vertex belongs to.
     pub const fn sphere(self) -> BaseTriSphere {
-        BaseTriSphere::from_u8(self.0.saturating_sub(6) / 6)
+        if self.0 < 12 {
+            BaseTriSphere::Icosa
+        } else if self.0 < 18 {
+            BaseTriSphere::Octa
+        } else {
+            BaseTriSphere::Tetra
+        }
     }
 
     /// Gets the face which [owns](OwnershipInfo) this vertex.
