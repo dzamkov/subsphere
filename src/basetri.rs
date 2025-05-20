@@ -18,11 +18,6 @@ pub enum BaseTriSphere {
 }
 
 impl BaseTriSphere {
-    #[inline]
-    pub(crate) const fn from_u8(value: u8) -> Self {
-        [ Self::Icosa, Self::Octa, Self::Tetra ][value as usize]
-    }
-    
     /// The degree of the vertices in this base shape.
     pub const fn vertex_degree(self) -> usize {
         self.lookup::<5, 4, 3>() as usize
@@ -134,7 +129,13 @@ pub struct Face(pub(crate) u8);
 impl Face {
     /// Gets the [`BaseTriSphere`] this face belongs to.
     pub const fn sphere(self) -> BaseTriSphere {
-        BaseTriSphere::from_u8(self.0.saturating_sub(12) / 8)
+        // Subtracting 12 and dividing by 8 are very cheap (second operation will be converted to a bitshift) so
+        // converting this to provably safe code (e.g. `if` statements to determine `BaseTriSphere` variant) will incur
+        // a performance penalty.
+        // Input to `std::mem::transmute` will be valid as long as `self.0` is less than or equal to 28. Since this
+        // struct represents a face of a triangular Platonic solid, which can never have more than 20 faces, the input
+        // will always be valid unless `Face` was constructed incorrectly somewhere else.
+        unsafe { std::mem::transmute(self.0.saturating_sub(12) / 8) }
     }
 
     /// Indicates whether this face [owns](OwnershipInfo) its second vertex.
