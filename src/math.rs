@@ -1,7 +1,8 @@
 //! This module contains a minimal set of linear algebra types and functions used by this crate. It
 //! has a very specific grab bag of functionality and is not intended to be publicly exposed for
 //! general use.
-pub use std::f64::consts::PI;
+
+use std::f64::consts::FRAC_PI_3;
 
 /// Contains functions related to vectors.
 pub(crate) mod vec {
@@ -160,6 +161,47 @@ fn solve_quadratic(a: f64, b: f64, c: f64) -> [Option<f64>; 2] {
     }
 }
 
+// https://en.wikipedia.org/wiki/Cubic_equation#Depressed_cubic
+// https://mathworld.wolfram.com/CubicFormula.html
+fn solve_depressed_cubic(p: f64, q: f64) -> [Option<f64>; 3] {
+    if p.abs() < SMALL {
+        [ Some(-q.cbrt()), None, None ]
+    } else {
+        let p3 = p * p * p;
+        let q2 = q * q;
+        let disc = 4.0 * p3 + 27.0 * q2;
+        
+        if disc.abs() < SMALL {
+            // Two equal roots
+            let r = 3.0 * q / p;
+            [ Some(r), Some(-r / 2.0), None ]
+        } else {
+            if disc < 0.0 {
+                // Three distinct real roots
+                // 2a, 7m, 3d, 1sqrt, 1acos, 3cos
+                let p_3 = -p / 3.0;
+                let k = 2.0 * p_3.sqrt();
+                // Absolute value not necessary after pulling p_3*p_3 out of sqrt because p is always negative.
+                let theta = (-q / (p_3 * k)).acos() / 3.0;
+                let phi = 2.0 * FRAC_PI_3;
+                
+                [
+                    Some(k * theta.cos()),
+                    Some(k * (theta + phi).cos()),
+                    Some(k * (theta + 2.0 * phi).cos())
+                ]
+            } else {
+                // One real root
+                let q_2 = -q / 2.0;
+                let b = (q2 / 4.0 + p3 / 27.0).sqrt();
+                let u1 = q_2 + b;
+                let u2 = q_2 - b;
+                [ Some(u1.cbrt() + u2.cbrt()), None, None ]
+            }
+        }
+    }
+}
+
 /// Determines the real roots of a cubic polynomial of the form `a x³ + b x² + c x + d`. IF a root has multiplicity
 /// greater than one, it will only appear once in the output.
 pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> [Option<f64>; 3] {
@@ -174,64 +216,20 @@ pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> [Option<f64>; 3] {
     } else {
         let b2 = b * b;
         let a2 = a * a;
-        let c2 = c * c;
         let ac = a * c;
-        let bd = b * d;
-        let disc = b2 * c2 - 4.0 * ac * c2 - 4.0 * b2 * bd - 27.0 * a2 * d * d + 18.0 * ac * bd;
         
-        // https://en.wikipedia.org/wiki/Cubic_equation#Depressed_cubic
-        if disc.abs() < SMALL {
-            // Two roots are equal
-            if (b2 - 3.0 * ac).abs() < SMALL {
-                // Triple root
-                [ Some(-b / (3.0 * a)), None, None ]
-            } else {
-                // Double root
-                [
-                    Some((4.0 * ac * b - 9.0 * a2 * d - b2 * b) / (a * (b2 - 3.0 * ac))),
-                    Some((9.0 * a * d - b * c) / (2.0 * (b2 - 3.0 * ac))),
-                    None
-                ]
-            }
+        let p = (3.0 * ac - b2) / (3.0 * a2);
+        let q = if b.abs() < SMALL {
+            d / a
         } else {
-            let p = (3.0 * ac - b2) / (3.0 * a2);
-            let q = (2.0 * b2 * b - 9.0 * ac * b + 27.0 * a2 * d) / (27.0 * a2 * a);
-            let s = b / (3.0 * a);
-            
-            if p.abs() < SMALL {
-                [ Some((-q).cbrt() - s), None, None ]
-            } else {
-                if disc > 0.0 {
-                    // Three distinct real roots
-                    let x = 3.0 * q / (2.0 * p) * (-3.0 / p).sqrt();
-                    let acos = x.acos() / 3.0;
-                    let k = 2.0 * (-p / 3.0).sqrt();
-                    let t = [
-                        // Unfortunately, it's not possible to reduce this except by solving a second cubic.
-                        k * acos.cos(),
-                        k * (acos - 2.0 * PI / 3.0).cos(),
-                        k * (acos - 4.0 * PI / 3.0).cos(),
-                    ];
-                    
-                    [ Some(t[0] - s), Some(t[1] - s), Some(t[2] - s) ]
-                } else {
-                    // One real root, two conjugate complex root
-                    if p > 0.0 {
-                        [
-                            Some(-2.0 * (p / 3.0).sqrt() * (((3.0 * q) / (2.0 * p) * (3.0 / p).sqrt()).asinh() / 3.0).sinh() - s),
-                            None,
-                            None
-                        ]
-                    } else {
-                        [
-                            Some(-2.0 * q.signum() * (-p / 3.0).sqrt() * ((-3.0 * q.abs() / (2.0 * p) * (-3.0 / p).sqrt()).acosh() / 3.0).cosh() - s),
-                            None,
-                            None
-                        ]
-                    }
-                }
-            }
-        }
+            (2.0 * b2 * b - 9.0 * ac * b + 27.0 * a2 * d) / (27.0 * a2 * a)
+        };
+        
+        let s = b / (3.0 * a);
+        
+        let roots = solve_depressed_cubic(p, q);
+        
+        [ roots[0].map(|r| r - s), roots[1].map(|r| r - s), roots[2].map(|r| r - s)]
     }
 }
 
