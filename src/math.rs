@@ -132,6 +132,7 @@ pub(crate) mod mat {
 }
 const SMALL: f64 = 1.0e-6;
 
+/// Solves the linear system `ax+b=0`, outputting `None` if there is no solution.
 const fn solve_linear(a: f64, b: f64) -> Option<f64> {
     if a.abs() <= SMALL {
         None
@@ -140,6 +141,8 @@ const fn solve_linear(a: f64, b: f64) -> Option<f64> {
     }
 }
 
+/// Determines the real roots of a quadratic polynomial of the form `a x² + b x + c`. If a root has multiplicity greater
+/// than one, it will only be including once in the output.
 fn solve_quadratic(a: f64, b: f64, c: f64) -> [Option<f64>; 2] {
     if a.abs() < SMALL {
         [ solve_linear(b, c), None ]
@@ -150,19 +153,19 @@ fn solve_quadratic(a: f64, b: f64, c: f64) -> [Option<f64>; 2] {
             [ Some(-b / (2.0 * a)), None ]
         } else if disc < 0.0 {
             [ None, None ]
+        } else if b.abs() < SMALL {
+            [ Some(c.abs().sqrt()), Some(-c.abs().sqrt()) ]
         } else {
-            if b.abs() < SMALL {
-                [ Some(c.abs().sqrt()), Some(-c.abs().sqrt()) ]
-            } else {
-                let u = -b - b.signum() * disc.sqrt();
-                [ Some(2.0 * c / u), Some(u / (2.0 * a)) ]
-            }
+            let u = -b - b.signum() * disc.sqrt();
+            [ Some(2.0 * c / u), Some(u / (2.0 * a)) ]
         }
     }
 }
 
 // https://en.wikipedia.org/wiki/Cubic_equation#Depressed_cubic
 // https://mathworld.wolfram.com/CubicFormula.html
+/// Determines the real roots of a depressed cubic polynomial of the form `x³ + p x + q`. IF a root has multiplicity
+/// greater than one, it will only appear once in the output.
 fn solve_depressed_cubic(p: f64, q: f64) -> [Option<f64>; 3] {
     if p.abs() < SMALL {
         [ Some(-q.cbrt()), None, None ]
@@ -175,29 +178,27 @@ fn solve_depressed_cubic(p: f64, q: f64) -> [Option<f64>; 3] {
             // Two equal roots
             let r = 3.0 * q / p;
             [ Some(r), Some(-r / 2.0), None ]
+        } else if disc < 0.0 {
+            // Three distinct real roots
+            // 2a, 7m, 3d, 1sqrt, 1acos, 3cos
+            let p_3 = -p / 3.0;
+            let k = 2.0 * p_3.sqrt();
+            // Absolute value not necessary after pulling p_3*p_3 out of sqrt because p is always negative.
+            let theta = (-q / (p_3 * k)).acos() / 3.0;
+            let phi = 2.0 * FRAC_PI_3;
+            
+            [
+                Some(k * theta.cos()),
+                Some(k * (theta + phi).cos()),
+                Some(k * (theta + 2.0 * phi).cos())
+            ]
         } else {
-            if disc < 0.0 {
-                // Three distinct real roots
-                // 2a, 7m, 3d, 1sqrt, 1acos, 3cos
-                let p_3 = -p / 3.0;
-                let k = 2.0 * p_3.sqrt();
-                // Absolute value not necessary after pulling p_3*p_3 out of sqrt because p is always negative.
-                let theta = (-q / (p_3 * k)).acos() / 3.0;
-                let phi = 2.0 * FRAC_PI_3;
-                
-                [
-                    Some(k * theta.cos()),
-                    Some(k * (theta + phi).cos()),
-                    Some(k * (theta + 2.0 * phi).cos())
-                ]
-            } else {
-                // One real root
-                let q_2 = -q / 2.0;
-                let b = (q2 / 4.0 + p3 / 27.0).sqrt();
-                let u1 = q_2 + b;
-                let u2 = q_2 - b;
-                [ Some(u1.cbrt() + u2.cbrt()), None, None ]
-            }
+            // One real root
+            let q_2 = -q / 2.0;
+            let b = (q2 / 4.0 + p3 / 27.0).sqrt();
+            let u1 = q_2 + b;
+            let u2 = q_2 - b;
+            [ Some(u1.cbrt() + u2.cbrt()), None, None ]
         }
     }
 }
