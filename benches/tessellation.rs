@@ -137,7 +137,7 @@ fn trisphere_icosa_fuller_b_0_face(c: &mut Criterion) {
         );
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
@@ -154,7 +154,7 @@ fn trisphere_icosa_gnomonic_b_0_face(c: &mut Criterion) {
         );
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
@@ -171,7 +171,7 @@ fn trisphere_octa_fuller_b_0_face(c: &mut Criterion) {
         );
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
@@ -188,7 +188,7 @@ fn trisphere_octa_gnomonic_b_0_face(c: &mut Criterion) {
         );
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
@@ -293,7 +293,7 @@ fn hexsphere_icosa_fuller_b_bmod3_face(c: &mut Criterion) {
         ).unwrap();
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
@@ -314,7 +314,7 @@ fn hexsphere_icosa_gnomonic_b_bmod3_face(c: &mut Criterion) {
         ).unwrap();
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
@@ -335,7 +335,7 @@ fn hexsphere_octa_fuller_b_bmod3_face(c: &mut Criterion) {
         ).unwrap();
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
@@ -356,7 +356,7 @@ fn hexsphere_octa_gnomonic_b_bmod3_face(c: &mut Criterion) {
         ).unwrap();
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere));
+            bencher.iter(|| tessellation_face_benchmark(sphere));
         });
     }
     group.finish();
