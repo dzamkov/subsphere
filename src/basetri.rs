@@ -129,6 +129,14 @@ pub struct Face(pub(crate) u8);
 impl Face {
     /// Gets the [`BaseTriSphere`] this face belongs to.
     pub const fn sphere(self) -> BaseTriSphere {
+        // SAFETY:
+        // Subtracting 12 and dividing by 8 are very cheap (second operation will be converted to a bitshift) so
+        // converting this to provably safe code (e.g. `if` statements to determine `BaseTriSphere` variant) will incur
+        // a performance penalty.
+        // Input to `std::mem::transmute` must be less than or equal to 2 so the input will be valid as long as the
+        // input is less than or equal to 35. Platonic solid share the same index space to avoid branching (0..20
+        // icosahedron, 20..28 octahedron, and 28..32 tetrahedron) meaning that the maximum value of `self.0` is 31 when
+        // constructed correctly, which is within the valid range. 
         unsafe { std::mem::transmute(self.0.saturating_sub(12) / 8) }
     }
 
@@ -221,7 +229,13 @@ pub struct Vertex(u8);
 impl Vertex {
     /// Gets the [`BaseTriSphere`] this vertex belongs to.
     pub const fn sphere(self) -> BaseTriSphere {
-        unsafe { std::mem::transmute(self.0.saturating_sub(6) / 6) }
+        if self.0 < 12 {
+            BaseTriSphere::Icosa
+        } else if self.0 < 18 {
+            BaseTriSphere::Octa
+        } else {
+            BaseTriSphere::Tetra
+        }
     }
 
     /// Gets the face which [owns](OwnershipInfo) this vertex.
@@ -267,7 +281,7 @@ impl HalfEdge {
         self.inside().sphere()
     }
 
-    /// The index of this half-edge within the [`sides`](crate::Face::sides) list of its
+    /// The index of this half-edge within the [`sides`](Face::sides) list of its
     /// [`inside`](HalfEdge::inside).
     pub const fn side_index(self) -> usize {
         (self.0 & 0b11) as usize

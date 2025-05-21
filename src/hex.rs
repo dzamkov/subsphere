@@ -51,7 +51,7 @@ impl<Proj> HexSphere<Proj> {
     }
 
     /// Replaces the projector of this sphere with the given one.
-    /// 
+    ///
     /// The resulting sphere will be topologically identical to this one, but the positions
     /// of the vertices will be changed according to the new projection.
     pub fn with_projector<NProj>(self, proj: NProj) -> HexSphere<NProj> {
@@ -186,14 +186,14 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
     }
 
     fn face_at(&self, point: [f64; 3]) -> Face<Proj> {
-        unsafe { Face::from_kis(self.kis.face_at(point)).unwrap_unchecked() }
+        Face::from_kis_unchecked(self.kis.face_at(point))
     }
 
     fn num_vertices(&self) -> usize {
         self.dual_num_divisions() * self.kis.base().num_faces()
     }
 
-    fn vertex(&self, index: usize) -> Vertex<Proj> {
+    fn vertex(&self, _index: usize) -> Vertex<Proj> {
         todo!()
     }
 
@@ -258,20 +258,35 @@ impl<Proj: Eq + Clone + BaseTriProjector> Face<Proj> {
         if kis.sphere.b() % 3 != kis.sphere.c() % 3 {
             return None;
         }
+        
+        Some(Self::from_kis_unchecked(kis))
+    }
+    
+    /// Unchecked variant of [from_center](Face::from_center).
+    fn from_center_unchecked(center: tri::Vertex<Proj>) -> Self {
+        debug_assert_eq!(center.sphere.b() % 3, center.sphere.c() % 3, "Sphere b and c parameters must be congruent mod 3.");
+        debug_assert_eq!(center.u % 3, center.adjusted_v() % 3, "Vertex u and adjusted v must be congruent mod 3.");
+        Self { center }
+    }
+    
+    /// Unchecked variant of [from_kis](Face::from_kis).
+    fn from_kis_unchecked(kis: tri::Face<Proj>) -> Self {
+        debug_assert_eq!(kis.sphere.b() % 3, kis.sphere.c() % 3, "Kis b and c parameters must be congruent mod 3.");
+        
         let adj_v = if !kis.region.ty().is_edge() {
             kis.sphere.c()
         } else {
             0
         };
+        
         let [u, v] = match ((kis.u_0 + 2 * (kis.v_0 + adj_v)) % 3, kis.boundary_along_v) {
             (0, _) => [kis.u_0, kis.v_0],
             (1, _) => [kis.u_0, kis.v_0 + 1],
             (_, false) => [kis.u_0 + 1, kis.v_0],
             (_, true) => [kis.u_0 - 1, kis.v_0 + 1],
         };
-        Some(unsafe {
-            Self::from_center(tri::Vertex::new(kis.sphere, kis.region, u, v)).unwrap_unchecked()
-        })
+        
+        Self::from_center_unchecked(tri::Vertex::new(kis.sphere, kis.region, u, v))
     }
 
     /// The [`HexSphere`] that this [`Face`] belongs to.
@@ -489,11 +504,11 @@ impl<Proj> HexSphere<Proj> {
     fn base_face_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_owned_vertices_before = face.num_owned_vertices_before()
-            + (face.owns_vertex_1() && region.ty() > BaseRegionType::Edge0) as usize;
+            + (face.owns_vertex_1() && region.ty() > BaseRegionType::EDGE_0) as usize;
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE_0) as usize;
         let num_interior_regions_before =
-            face.index() + (region.ty() > BaseRegionType::Interior) as usize;
+            face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_owned_vertices_before
             + num_edge_regions_before * self.num_faces_per_edge_region()
             + num_interior_regions_before * self.num_faces_per_interior_region()
@@ -503,9 +518,9 @@ impl<Proj> HexSphere<Proj> {
     fn base_vertex_index(&self, region: BaseRegion) -> usize {
         let face = region.owner();
         let num_edge_regions_before =
-            face.num_owned_edges_before() + (region.ty() > BaseRegionType::Edge0) as usize;
+            face.num_owned_edges_before() + (region.ty() > BaseRegionType::EDGE_0) as usize;
         let num_interior_regions_before =
-            face.index() + (region.ty() > BaseRegionType::Interior) as usize;
+            face.index() + (region.ty() > BaseRegionType::INTERIOR) as usize;
         num_edge_regions_before * self.num_vertices_per_edge_region()
             + num_interior_regions_before * self.num_vertices_per_interior_region()
     }
@@ -562,15 +577,12 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
     fn next(&mut self) -> Option<Face<Proj>> {
         loop {
             if self.u < self.u_end {
-                let res = unsafe {
-                    Face::from_center(tri::Vertex {
-                        sphere: self.sphere.kis.clone(),
-                        region: self.region,
-                        u: self.u,
-                        v: self.v,
-                    })
-                    .unwrap_unchecked()
-                };
+                let res = Face::from_center_unchecked(tri::Vertex {
+                    sphere: self.sphere.kis.clone(),
+                    region: self.region,
+                    u: self.u,
+                    v: self.v,
+                });
                 self.u += 3;
                 return Some(res);
             } else if self.region.ty().is_edge() {
@@ -579,18 +591,15 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
                     self.u = 1 + (self.v + 2) % 3;
                     continue;
                 } else if self.u <= self.u_end
-                    && self.region.ty() == BaseRegionType::Edge0
+                    && self.region.ty() == BaseRegionType::EDGE_0
                     && self.region.owner().owns_vertex_1()
                 {
-                    let res = unsafe {
-                        Face::from_center(tri::Vertex {
-                            sphere: self.sphere.kis.clone(),
-                            region: self.region,
-                            u: self.u,
-                            v: self.v,
-                        })
-                        .unwrap_unchecked()
-                    };
+                    let res = Face::from_center_unchecked(tri::Vertex {
+                        sphere: self.sphere.kis.clone(),
+                        region: self.region,
+                        u: self.u,
+                        v: self.v,
+                    });
                     self.u += 3;
                     return Some(res);
                 }

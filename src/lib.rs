@@ -1,4 +1,5 @@
 #![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
+#![deny(clippy::undocumented_unsafe_blocks)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 mod math;
