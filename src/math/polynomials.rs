@@ -69,15 +69,17 @@ fn solve_quadratic(a: f64, b: f64, c: f64) -> Roots {
             Roots::Two(c.abs().sqrt(), -c.abs().sqrt())
         }
     } else {
-        let disc = b * b - 4.0 * a * c;
+        let j = 2.0 * c;
+        let k = 2.0 * a;
+        let disc = b * b - j * k;
         
         if disc.abs() < SMALL {
-            Roots::One(-b / (2.0 * a))
+            Roots::One(-b / k)
         } else if disc < 0.0 {
             Roots::Zero
         } else {
-            let u = -b - b.signum() * disc.sqrt();
-            Roots::Two(2.0 * c / u, u / (2.0 * a))
+            let u = -b - disc.sqrt().copysign(b);
+            Roots::Two(j / u, u / k)
         }
     }
 }
