@@ -1,6 +1,7 @@
 use std::f64::consts::FRAC_PI_3;
 use crate::math::SMALL;
 
+/// Represents the distinct real roots of a cubic equation.
 #[derive(Copy, Clone)]
 pub enum Roots {
     Zero,
@@ -10,8 +11,9 @@ pub enum Roots {
 }
 
 impl Roots {
+    /// Appends `v` to the end of the list of roots if there are less than three, otherwise does nothing.
     #[inline]
-    const fn push(self, v: f64) -> Self {
+    const fn append(self, v: f64) -> Self {
         match self {
             Roots::Zero => Self::One(v),
             Roots::One(a) => Self::Two(a, v),
@@ -20,6 +22,7 @@ impl Roots {
         }
     }
     
+    /// Adds `v` to the value of all roots.
     #[inline]
     const fn add(self, v: f64) -> Self {
         match self {
@@ -45,7 +48,7 @@ impl IntoIterator for Roots {
     }
 }
 
-/// Solves the linear system `ax+b=0`, outputting `None` if there is no solution.
+/// Solves the linear system `ax+b=0`.
 const fn solve_linear(a: f64, b: f64) -> Roots {
     if a.abs() <= SMALL {
         Roots::Zero
@@ -81,7 +84,7 @@ fn solve_quadratic(a: f64, b: f64, c: f64) -> Roots {
 
 // https://en.wikipedia.org/wiki/Cubic_equation#Depressed_cubic
 // https://mathworld.wolfram.com/CubicFormula.html
-/// Determines the real roots of a depressed cubic polynomial of the form `x³ + p x + q`. IF a root has multiplicity
+/// Determines the real roots of a depressed cubic polynomial of the form `x³ + p x + q`. If a root has multiplicity
 /// greater than one, it will only appear once in the output.
 fn solve_depressed_cubic(p: f64, q: f64) -> Roots {
     if p.abs() < SMALL {
@@ -126,7 +129,7 @@ pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> Roots {
     if a.abs() < SMALL {
         solve_quadratic(b, c, d)
     } else if d.abs() < SMALL {
-        solve_quadratic(a, b, c).push(0.0)
+        solve_quadratic(a, b, c).append(0.0)
     } else {
         let b2 = b * b;
         let a2 = a * a;
