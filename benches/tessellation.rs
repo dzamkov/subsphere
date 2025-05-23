@@ -42,21 +42,18 @@ criterion_main!(
     hexsphere_octa
 );
 
-fn tessellation_vertex_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessellation, n: usize) {
-    let mut vertices = Vec::with_capacity(n);
-    
+fn tessellation_vertex_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessellation, vertices: &mut Vec<[f64; 3]>) {
     vertices.extend(sphere.vertices()
         .map(|v| v.pos()));
     
     black_box(vertices);
 }
 
-fn tessellation_face_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessellation, n: usize) {
-    let mut indices = Vec::with_capacity(n);
-    
+fn tessellation_face_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessellation, indices: &mut Vec<usize>) {
     for face in sphere.faces() {
         indices.extend(face.vertices().map(|v| v.index()));
     }
+    
     black_box(indices);
 }
 
@@ -70,9 +67,10 @@ fn trisphere_icosa_fuller_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -88,9 +86,10 @@ fn trisphere_icosa_gnomonic_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -106,9 +105,10 @@ fn trisphere_octa_fuller_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -124,9 +124,10 @@ fn trisphere_octa_gnomonic_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -142,9 +143,10 @@ fn trisphere_icosa_fuller_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
@@ -160,9 +162,10 @@ fn trisphere_icosa_gnomonic_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
@@ -178,9 +181,10 @@ fn trisphere_octa_fuller_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
@@ -196,9 +200,10 @@ fn trisphere_octa_gnomonic_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
@@ -218,9 +223,10 @@ fn hexsphere_icosa_fuller_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -240,9 +246,10 @@ fn hexsphere_icosa_gnomonic_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -262,9 +269,10 @@ fn hexsphere_octa_fuller_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -284,9 +292,10 @@ fn hexsphere_octa_gnomonic_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
+        let mut vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_vertex_benchmark(sphere, n));
+            bencher.iter(|| tessellation_vertex_benchmark(sphere, &mut vertices));
         });
     }
     group.finish();
@@ -306,9 +315,10 @@ fn hexsphere_icosa_fuller_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
@@ -328,9 +338,10 @@ fn hexsphere_icosa_gnomonic_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
@@ -350,9 +361,10 @@ fn hexsphere_octa_fuller_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
@@ -372,9 +384,10 @@ fn hexsphere_octa_gnomonic_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
+        let mut indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
-            bencher.iter(|| tessellation_face_benchmark(sphere, n));
+            bencher.iter(|| tessellation_face_benchmark(sphere, &mut indices));
         });
     }
     group.finish();
