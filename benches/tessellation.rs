@@ -51,7 +51,8 @@ fn tessellation_vertex_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessel
 }
 
 fn tessellation_face_benchmark<Tessellation: subsphere::Sphere>(sphere: Tessellation) {
-    let mut indices = Vec::new();
+    let n = sphere.num_faces() * sphere.face(0).vertices().count() + 1;
+    let mut indices = Vec::with_capacity(n);
     for face in sphere.faces() {
         indices.extend(face.vertices().map(|v| v.index()));
     }
