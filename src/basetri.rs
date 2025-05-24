@@ -136,7 +136,7 @@ impl Face {
         // Input to `std::mem::transmute` must be less than or equal to 2 so the input will be valid as long as the
         // input is less than or equal to 35. Platonic solid share the same index space to avoid branching (0..20
         // icosahedron, 20..28 octahedron, and 28..32 tetrahedron) meaning that the maximum value of `self.0` is 31 when
-        // constructed correctly, which is within the valid range.
+        // constructed correctly, which is within the valid range. 
         unsafe { std::mem::transmute(self.0.saturating_sub(12) / 8) }
     }
 

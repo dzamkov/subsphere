@@ -662,6 +662,7 @@ impl HalfEdgeDir {
     }
 }
 
+
 impl<Proj> HalfEdge<Proj> {
     /// Attempts to construct a [`HalfEdge`] with the given properties, normalizing
     /// `region` to be its proper owner.
