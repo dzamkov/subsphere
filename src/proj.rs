@@ -2,13 +2,13 @@
 use crate::basetri;
 #[expect(unused_imports)]
 use crate::basetri::BaseTriSphere;
-use crate::math::{self, mat, vec};
+use crate::math::{mat, vec};
 #[expect(unused_imports)]
 use crate::tri::TriSphere;
 
 pub use fuller::Fuller;
 pub use gnomonic::Gnomonic;
-pub use tri::{BaseTriProjector, TriProjector, Default};
+pub use tri::{BaseTriProjector, Default, TriProjector};
 
 /// Maps two-dimensional "local" coordinates to points on the unit sphere.
 ///
@@ -254,6 +254,7 @@ pub mod gnomonic {
 
 /// Contains types related to the [`Fuller`] projection.
 pub mod fuller {
+    use crate::math::polynomials;
     use super::*;
 
     /// The [Fuller](https://en.wikipedia.org/wiki/Dymaxion_map) projection method.
@@ -332,35 +333,37 @@ pub mod fuller {
             let den_v = 1.0 - t_half_proj_v * t_half_proj_v;
             let s = t_half_proj_u * den_v + t_half_proj_v * den_u;
             let p = t_half_proj_u * t_half_proj_v;
-            let (t_x, _) = math::solve_cubic(
+            let (t_x, _) = polynomials::solve_cubic(
                 4.0 * p,
                 4.0 * t_alpha * p - 4.0 * s,
                 3.0 * den_u * den_v - 8.0 * p - 2.0 * t_alpha * s,
                 t_alpha * den_u * den_v + 2.0 * s,
             )
-            .map(|t_x| {
-                // There may be up to three solutions to the cubic equation, but only one
-                // corresponds to the correct projection solution. This is the unique solution
-                // which satisfies:
-                //   * `-self.full_angle / 2.0 <= x <= self.full_angle / 2.0`
-                //   * `-self.full_angle / 2.0 <= x + proj_u <= self.full_angle / 2.0`
-                //   * `-self.full_angle / 2.0 <= x + proj_v <= self.full_angle / 2.0`
-                //
-                // or equivalently:
-                //   * `-t_alpha <= tan(x) <= t_alpha`
-                //   * `-t_alpha <= tan(x + proj_u) <= t_alpha`
-                //   * `-t_alpha <= tan(x + proj_v) <= t_alpha`
-
-                // Assuming there is exactly one such solution, it will be the one with the
-                // smallest `max(|tan(x)|, |tan(x + proj_u)|, |tan(x + proj_v)|)`
-                let t_x_proj_u =
-                    (den_u + 2.0 * t_half_proj_u) / (den_u - 2.0 * t_x * t_half_proj_u);
-                let t_x_proj_v =
-                    (den_v + 2.0 * t_half_proj_v) / (den_v - 2.0 * t_x * t_half_proj_v);
-                (t_x, t_x.abs().max(t_x_proj_u.abs()).max(t_x_proj_v.abs()))
-            })
+                .into_iter()
+                .map(|t_x| {
+                    // There may be up to three solutions to the cubic equation, but only one
+                    // corresponds to the correct projection solution. This is the unique solution
+                    // which satisfies:
+                    //   * `-self.full_angle / 2.0 <= x <= self.full_angle / 2.0`
+                    //   * `-self.full_angle / 2.0 <= x + proj_u <= self.full_angle / 2.0`
+                    //   * `-self.full_angle / 2.0 <= x + proj_v <= self.full_angle / 2.0`
+                    //
+                    // or equivalently:
+                    //   * `-t_alpha <= tan(x) <= t_alpha`
+                    //   * `-t_alpha <= tan(x + proj_u) <= t_alpha`
+                    //   * `-t_alpha <= tan(x + proj_v) <= t_alpha`
+                    
+                    // Assuming there is exactly one such solution, it will be the one with the
+                    // smallest `max(|tan(x)|, |tan(x + proj_u)|, |tan(x + proj_v)|)`
+                    let t_x_proj_u =
+                        (den_u + 2.0 * t_half_proj_u) / (den_u - 2.0 * t_x * t_half_proj_u);
+                    let t_x_proj_v =
+                        (den_v + 2.0 * t_half_proj_v) / (den_v - 2.0 * t_x * t_half_proj_v);
+                    (t_x, t_x.abs().max(t_x_proj_u.abs()).max(t_x_proj_v.abs()))
+                })
             .min_by(|(_, a), (_, b)| a.abs().partial_cmp(&b.abs()).unwrap())
             .unwrap();
+            
             let x = t_x.atan();
 
             // Use the solution to compute angle offsets of two planes from the second and
@@ -369,20 +372,20 @@ pub mod fuller {
             let a_1 = a_0 - (2.0 * u + v - 1.0) * self.angle;
 
             // Construct planes by offsetting the second and third edges of the triangle
-            let n_0 = vec::normalize(vec::cross(
+            let n_0 = vec::cross(
                 mat::apply(
                     [self.points[0], self.points[1]],
                     [(self.angle - a_0).sin(), a_0.sin()],
                 ),
                 vec::sub(self.points[2], self.points[1]),
-            ));
-            let n_1 = vec::normalize(vec::cross(
+            );
+            let n_1 = vec::cross(
                 mat::apply(
                     [self.points[1], self.points[2]],
                     [(self.angle - a_1).sin(), a_1.sin()],
                 ),
                 vec::sub(self.points[0], self.points[2]),
-            ));
+            );
 
             // The projected point is the intersection of the two planes
             vec::normalize(vec::cross(n_0, n_1))

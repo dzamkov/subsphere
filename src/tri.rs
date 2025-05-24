@@ -1352,7 +1352,7 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
                 self.sphere
                     .projector()
                     .inside(region.as_edge().twin())
-                    .to_sphere(vec::add([1.0, 0.0], vec::neg(coords)))
+                    .to_sphere(vec::sub([1.0, 0.0], coords))
             }
         } else {
             self.sphere
