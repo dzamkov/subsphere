@@ -67,7 +67,7 @@ fn trisphere_icosa_fuller_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -90,7 +90,7 @@ fn trisphere_icosa_gnomonic_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -113,7 +113,7 @@ fn trisphere_octa_fuller_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -136,7 +136,7 @@ fn trisphere_octa_gnomonic_b_0_vertex(c: &mut Criterion) {
             0,
         );
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -159,7 +159,7 @@ fn trisphere_icosa_fuller_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -182,7 +182,7 @@ fn trisphere_icosa_gnomonic_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -205,7 +205,7 @@ fn trisphere_octa_fuller_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -228,7 +228,7 @@ fn trisphere_octa_gnomonic_b_0_face(c: &mut Criterion) {
             0,
         );
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -255,7 +255,7 @@ fn hexsphere_icosa_fuller_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -282,7 +282,7 @@ fn hexsphere_icosa_gnomonic_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -309,7 +309,7 @@ fn hexsphere_octa_fuller_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -336,7 +336,7 @@ fn hexsphere_octa_gnomonic_b_bmod3_vertex(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.vertices().count();
-        let mut vertices = Vec::with_capacity(n);
+        let vertices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -363,7 +363,7 @@ fn hexsphere_icosa_fuller_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -390,7 +390,7 @@ fn hexsphere_icosa_gnomonic_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -417,7 +417,7 @@ fn hexsphere_octa_fuller_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
@@ -444,7 +444,7 @@ fn hexsphere_octa_gnomonic_b_bmod3_face(c: &mut Criterion) {
             )
         ).unwrap();
         let n = sphere.num_faces() * (sphere.face(0).vertices().count() + 1);
-        let mut indices = Vec::with_capacity(n);
+        let indices = Vec::with_capacity(n);
         
         group.bench_with_input(BenchmarkId::from_parameter(b), &b, |bencher, _| {
             bencher.iter_batched_ref(
