@@ -48,39 +48,25 @@ impl IntoIterator for Roots {
     }
 }
 
-/// Solves the linear system `ax+b=0`.
-const fn solve_linear(a: f64, b: f64) -> Roots {
-    if a.abs() <= SMALL {
-        Roots::Zero
-    } else {
-        Roots::One(-b / a)
-    }
-}
-
 /// Determines the real roots of a quadratic polynomial of the form `a x² + b x + c`. If a root has multiplicity greater
 /// than one, it will only be including once in the output.
 fn solve_quadratic(a: f64, b: f64, c: f64) -> Roots {
     if a.abs() < SMALL {
-        solve_linear(b, c)
-    } else if b.abs() < SMALL {
-        if c > 0.0 {
-            Roots::Zero
-        } else {
-            Roots::Two(c.abs().sqrt(), -c.abs().sqrt())
-        }
+        // ~10%
+        // `|b|` was never less than 10^-6 in testing so we disregard the possibility that this may output `NaN`.
+        Roots::One(-c / b)
     } else {
+        // In testing, `|b|` was less than 10^-6 in less than 0.01% of cases where `solve_quadratic` was called so
+        // adding a branch for when `b` is close to 0 would cost more than it saves.
         let j = 2.0 * c;
         let k = 2.0 * a;
         let disc = b * b - j * k;
         
-        if disc.abs() < SMALL {
-            Roots::One(-b / k)
-        } else if disc < 0.0 {
-            Roots::Zero
-        } else {
-            let u = -b - disc.sqrt().copysign(b);
-            Roots::Two(j / u, u / k)
-        }
+        // This will panic if the discriminant is negative, but it was always positive in testing, so we assume it will
+        // always be positive.
+        // TODO: Can we prove this from the Fuller projection equations?
+        let u = -b - disc.sqrt().copysign(b);
+        Roots::Two(j / u, u / k)
     }
 }
 
@@ -89,39 +75,36 @@ fn solve_quadratic(a: f64, b: f64, c: f64) -> Roots {
 /// Determines the real roots of a depressed cubic polynomial of the form `x³ + p x + q`. If a root has multiplicity
 /// greater than one, it will only appear once in the output.
 fn solve_depressed_cubic(p: f64, q: f64) -> Roots {
-    if p.abs() < SMALL {
-        Roots::One(-q.cbrt())
-    } else {
-        let p3 = p * p * p;
-        let q2 = q * q;
-        let disc = 4.0 * p3 + 27.0 * q2;
+    // In general, a case to just output the negative cube root of `q` when `p` is close to 0 would improve performance.
+    // However, in testing, `|p|` was less than 10^-6 in less than 0.0001% of cases, so branching would cost more than
+    // it gained.
+    let p3 = p * p * p;
+    let q2 = q * q;
+    let disc = 4.0 * p3 + 27.0 * q2;
+    
+    // If the discriminant is 0, there will be two distinct real roots, `r=3*p/q` and `-r/2`. In testing, the absolute
+    // value of the discriminant was never less than 10^-6 so this case can be disregarded.
+    if disc < 0.0 {
+        // Three distinct real roots
+        // 2a, 7m, 3d, 1sqrt, 1acos, 3cos
+        let p_3 = -p / 3.0;
+        let k = 2.0 * p_3.sqrt();
+        // Absolute value not necessary after pulling p_3*p_3 out of sqrt because p is always negative.
+        let theta = (-q / (p_3 * k)).acos() / 3.0;
+        let phi = 2.0 * FRAC_PI_3;
         
-        if disc.abs() < SMALL {
-            // Two equal roots
-            let r = 3.0 * q / p;
-            Roots::Two(r, -r / 2.0)
-        } else if disc < 0.0 {
-            // Three distinct real roots
-            // 2a, 7m, 3d, 1sqrt, 1acos, 3cos
-            let p_3 = -p / 3.0;
-            let k = 2.0 * p_3.sqrt();
-            // Absolute value not necessary after pulling p_3*p_3 out of sqrt because p is always negative.
-            let theta = (-q / (p_3 * k)).acos() / 3.0;
-            let phi = 2.0 * FRAC_PI_3;
-            
-            Roots::Three(
-                k * theta.cos(),
-                k * (theta + phi).cos(),
-                k * (theta + 2.0 * phi).cos()
-            )
-        } else {
-            // One real root
-            let q_2 = -q / 2.0;
-            let b = (q2 / 4.0 + p3 / 27.0).sqrt();
-            let u1 = q_2 + b;
-            let u2 = q_2 - b;
-            Roots::One(u1.cbrt() + u2.cbrt())
-        }
+        Roots::Three(
+            k * theta.cos(),
+            k * (theta + phi).cos(),
+            k * (theta + 2.0 * phi).cos()
+        )
+    } else {
+        // One real root
+        let q_2 = -q / 2.0;
+        let b = (q2 / 4.0 + p3 / 27.0).sqrt();
+        let u1 = q_2 + b;
+        let u2 = q_2 - b;
+        Roots::One(u1.cbrt() + u2.cbrt())
     }
 }
 
@@ -129,20 +112,19 @@ fn solve_depressed_cubic(p: f64, q: f64) -> Roots {
 /// greater than one, it will only appear once in the output.
 pub fn solve_cubic(a: f64, b: f64, c: f64, d: f64) -> Roots {
     if a.abs() < SMALL {
+        // ~10%
         solve_quadratic(b, c, d)
-    } else if d.abs() < SMALL {
-        solve_quadratic(a, b, c).append(0.0)
     } else {
+        // In a general solver, a case for when `d` is close to 0 could improve performance. In testing this library,
+        // `d` was never smaller than 10^-6 so the branch would not be useful.
         let b2 = b * b;
         let a2 = a * a;
         let ac = a * c;
         
         let p = (3.0 * ac - b2) / (3.0 * a2);
-        let q = if b.abs() < SMALL {
-            d / a
-        } else {
-            (2.0 * b2 * b - 9.0 * ac * b + 27.0 * a2 * d) / (27.0 * a2 * a)
-        };
+        // If `b` is close to 0, this expression will be very close to `d/a`. In testing this library `|b|` was less 
+        // than 10^-6 in less than 0.0001% of cases so the branch would cost more performance than it saved.
+        let q = (2.0 * b2 * b - 9.0 * ac * b + 27.0 * a2 * d) / (27.0 * a2 * a);
         
         let s = b / (3.0 * a);
         
