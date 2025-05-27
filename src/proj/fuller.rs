@@ -183,40 +183,12 @@ fn test_roundtrip() {
 
 const SMALL: f64 = 1.0e-6;
 
-/// Represents the distinct real roots of a cubic equation used in the Fuller projection. This library will only ever
-/// solve equations with 2 or 3 distinct real roots so we neglect handling other cases in the name of performance.
-#[derive(Copy, Clone)]
-struct Roots(f64, f64, Option<f64>);
-
-impl Roots {
-    /// Adds `v` to the value of all roots.
-    #[inline]
-    const fn add(self, v: f64) -> Self {
-        match self.2 {
-            None => Self(self.0 + v, self.1 + v, None),
-            Some(c) => Self(self.0 + v, self.1 + v, Some(c + v))
-        }
-    }
-}
-
-impl IntoIterator for Roots {
-    type Item = f64;
-    type IntoIter = std::iter::Take<std::array::IntoIter<f64, 3>>;
-    
-    fn into_iter(self) -> Self::IntoIter {
-        match self.2 {
-            None => [self.0, self.1, 0.0].into_iter().take(2),
-            Some(c) => [self.0, self.1, c].into_iter().take(3)
-        }
-    }
-}
-
 /// Determines the real roots of the variety of cubic polynomials which appear in the Fuller projection. If a root has
 /// multiplicity greater than one, it will only appear once in the output. Takes 36.9 FLOPs in this library's typical
 /// usage. This is not a general purpose solver and is optimized for the specific types of cubics encountered in the
 /// Fuller projection. As such, multiple branches that are never encountered in the Fuller projection have been removed
 /// for speed so this method *will* fail if used as a general purpose solver.
-fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> Roots {
+fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> impl IntoIterator<Item = f64> {
     if a.abs() < SMALL {
         // Branch taken ~10% of the time in testing.
         // Solve quadratic
@@ -228,7 +200,7 @@ fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> Roots {
         // TODO: Can we find a proof?
         debug_assert!(disc >= 0.0, "Quadratic discriminant was negative.");
         let u = -c - disc.sqrt().copysign(c);
-        Roots(j / u, u / k, None)
+        [j / u, u / k, 0.0].into_iter().take(2)
     } else {
         // Convert to a depressed cubic
         // https://en.wikipedia.org/wiki/Cubic_equation#Depressed_cubic
@@ -260,11 +232,11 @@ fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> Roots {
         let theta = (-q / (p_3 * k)).acos() / 3.0;
         const PHI: f64 = 2.0 * FRAC_PI_3;
         
-        Roots(
+        [
             k * theta.cos() - s,
             k * (theta + PHI).cos() - s,
-            Some(k * (theta + 2.0 * PHI).cos() - s)
-        )
+            k * (theta + 2.0 * PHI).cos() - s
+        ].into_iter().take(3)
     }
 }
 
