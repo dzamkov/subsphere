@@ -2,8 +2,6 @@
 //! has a very specific grab bag of functionality and is not intended to be publicly exposed for
 //! general use.
 
-pub mod polynomials;
-
 /// Contains functions related to vectors.
 pub(crate) mod vec {
     /// Negates a vector.
