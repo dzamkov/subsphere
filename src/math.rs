@@ -128,4 +128,3 @@ pub(crate) mod mat {
         [[d, -b], [-c, a]]
     }
 }
-const SMALL: f64 = 1.0e-6;

@@ -181,17 +181,18 @@ fn test_roundtrip() {
     }
 }
 
-const SMALL: f64 = 1.0e-6;
-
-/// Determines the real roots of the variety of cubic polynomials which appear in the Fuller projection. If a root has
-/// multiplicity greater than one, it will only appear once in the output. Takes 36.9 FLOPs in this library's typical
-/// usage. This is not a general purpose solver and is optimized for the specific types of cubics encountered in the
-/// Fuller projection. As such, multiple branches that are never encountered in the Fuller projection have been removed
-/// for speed so this method *will* fail if used as a general purpose solver.
+/// Determines the real roots of a cubic polynomial of the form `a x³ + b x² + c x + d` as used in the Fuller
+/// projection. This is not a general purpose solver and is optimized for the specific types of cubics encountered in
+/// the Fuller projection. As such, multiple branches that are never encountered in that context have been removed for
+/// performance purposes. Most notably, this method only handles polynomials with 2 or 3 real roots. Takes 36.9 FLOPs on
+/// average in the `test` build.
 fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> impl IntoIterator<Item = f64> {
+    const SMALL: f64 = 1.0e-6;
     if a.abs() < SMALL {
+        // Branch needed to avoid loss of precision when `a` is relatively small. Determines the real roots of the
+        // quadratic `b x² + c x + d`. In the Fuller projection, this will always have two real roots, so we avoid
+        // checking if the discriminant is non-negative in non-debug builds.
         // Branch taken ~10% of the time in testing.
-        // Solve quadratic
         let j = 2.0 * d;
         let k = 2.0 * b;
         let disc = c * c - j * k;
@@ -202,7 +203,7 @@ fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> impl IntoIterator<Item 
         let u = -c - disc.sqrt().copysign(c);
         [j / u, u / k, 0.0].into_iter().take(2)
     } else {
-        // Convert to a depressed cubic
+        // Convert to a depressed cubic of the form `t³ p t + q` where `t = x - b/3a` and finds the real roots.
         // https://en.wikipedia.org/wiki/Cubic_equation#Depressed_cubic
         // https://mathworld.wolfram.com/CubicFormula.html
         // In a general solver, a case for when `d` is close to 0 could improve performance. In testing this library,
@@ -266,6 +267,7 @@ fn test_solve_cubic() {
 
 #[cfg(test)]
 fn assert_similar<const N: usize>(mut a: Vec<f64>, mut b: [f64; N]) {
+    const SMALL: f64 = 1.0e-6;
     a.sort_by(|u, v| u.partial_cmp(v).unwrap());
     b.sort_by(|u, v| u.partial_cmp(v).unwrap());
     if a.len() != b.len() || a.iter().zip(b.iter()).any(|(x, y)| (x - y).abs() > SMALL) {
