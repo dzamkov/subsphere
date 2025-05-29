@@ -26,13 +26,12 @@ impl BaseTriSphere {
     /// The length of any edge on this base shape, or equivalently, the angle between any
     /// two adjacent vertices.
     pub const fn edge_length(self) -> f64 {
-        [1.1071487177940904, std::f64::consts::FRAC_PI_2][self as usize]
+        self.consts().angle
     }
 
-    /// The cosine of [`edge_length`](BaseTriSphere::edge_length`), or equivalently, the dot
-    /// product between any two adjacent vertices.
-    pub const fn edge_cos_length(self) -> f64 {
-        [C_1, 0.0][self as usize]
+    /// The constants associated with this base shape.
+    pub(crate) const fn consts(self) -> &'static Consts {
+        &CONSTS[self as usize]
     }
 
     /// The internal representation of the first face of this base shape.
@@ -365,6 +364,40 @@ impl crate::HalfEdge for HalfEdge {
         (*self).next()
     }
 }
+
+/// Constants associated with a particular [`BaseTriSphere`].
+pub(crate) struct Consts {
+    /// The angle between two adjacent vertices on the sphere.
+    pub angle: f64,
+
+    /// `sin(angle / 2)`
+    pub sin_half_angle: f64,
+
+    /// `cos(angle / 2)`
+    pub cos_half_angle: f64,
+
+    /// `tan(angle / 2)`
+    pub tan_half_angle: f64,
+}
+
+static CONSTS: [Consts; 2] = const {
+    [
+        // Icosahedron
+        Consts {
+            angle: 1.1071487177940904,
+            sin_half_angle: C_5,
+            cos_half_angle: C_3,
+            tan_half_angle: C_5 / C_3,
+        },
+        // Octahedron
+        Consts {
+            angle: std::f64::consts::FRAC_PI_2,
+            sin_half_angle: std::f64::consts::FRAC_1_SQRT_2,
+            cos_half_angle: std::f64::consts::FRAC_1_SQRT_2,
+            tan_half_angle: 1.0,
+        },
+    ]
+};
 
 /// Table used to implement [`crate::Vertex::outgoing`].
 static OUTGOING: [[HalfEdge; 5]; NUM_VERTS] = const {

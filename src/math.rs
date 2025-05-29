@@ -55,13 +55,7 @@ pub(crate) mod vec {
     /// Divides a vector by a scalar.
     #[inline]
     pub const fn div<const N: usize>(a: [f64; N], b: f64) -> [f64; N] {
-        let mut res = [0.0; N];
-        let mut i = 0;
-        while i < N {
-            res[i] = a[i] / b;
-            i += 1;
-        }
-        res
+        mul(a, 1.0 / b)
     }
 
     /// Computes the dot product of two vectors.
