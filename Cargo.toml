@@ -14,7 +14,7 @@ readme = "README.md"
 members = ["render"]
 
 [dev-dependencies]
-divan = "0.1.21"
+criterion = "0.6"
 
 [[bench]]
 name = "tessellation"
