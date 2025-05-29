@@ -99,7 +99,10 @@ pub(crate) mod mat {
 
     /// Multiplies a matrix with a vector.
     #[inline]
-    pub const fn apply<const N: usize, const M: usize>(mat: [[f64; N]; M], vec: [f64; M]) -> [f64; N] {
+    pub const fn apply<const N: usize, const M: usize>(
+        mat: [[f64; N]; M],
+        vec: [f64; M],
+    ) -> [f64; N] {
         let mut res = [0.0; N];
         let mut i = 0;
         while i < M {

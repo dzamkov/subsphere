@@ -640,7 +640,7 @@ impl HalfEdgeDir {
     pub const VN: Self = Self(4);
     /// The +U/-V direction.
     pub const UP_VN: Self = Self(5);
-    
+
     /// Constructs a [`HalfEdgeDir`] from the given index.
     ///
     /// This corresponds to an angle of `index * 60` degrees.
@@ -648,20 +648,19 @@ impl HalfEdgeDir {
         assert!(index < 6, "index out of bounds: {}", index);
         Self(index as u8)
     }
-    
+
     /// Converts this direction into a vector representation.
     pub fn into_vec(self) -> [i32; 2] {
         let u = (0x020100000102u64 >> (self.0 as usize * 8)) as u8 as i32 - 1;
         let v = (0x000001020201u64 >> (self.0 as usize * 8)) as u8 as i32 - 1;
         [u, v]
     }
-    
+
     /// Rotates this [`HalfEdgeDir`] counter-clockwise by `amount * 60` degrees.
     pub fn rotate_ccw(self, amount: usize) -> Self {
         Self(((self.0 as usize + amount) % 6) as u8)
     }
 }
-
 
 impl<Proj> HalfEdge<Proj> {
     /// Attempts to construct a [`HalfEdge`] with the given properties, normalizing
@@ -942,7 +941,7 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::HalfEdge for HalfEdge<Proj> {
             HalfEdgeDir::UN => (0, -1),
             HalfEdgeDir::VN => (0, -1),
             HalfEdgeDir::UP_VN => (1, -1),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
         Face {
             sphere: self.sphere.clone(),
@@ -1263,7 +1262,7 @@ impl BaseRegionType {
     pub const INTERIOR: Self = Self(1);
     /// Corresponds to the third edge of [`BaseRegion::owner`].
     pub const EDGE_2: Self = Self(3);
-    
+
     /// Indicates whether this region corresponds to an edge.
     pub fn is_edge(self) -> bool {
         self != Self::INTERIOR
@@ -1395,7 +1394,7 @@ impl<Proj: BaseTriProjector> SphereProjection<'_, Proj> {
                     debug_assert!(u < b);
                     let r_v = ((v + c as f64).max(0.0) as u32).min(c - 1);
                     (BaseRegion::new(face, BaseRegionType::EDGE_0), [u, r_v])
-                }
+                };
             } else {
                 let r_u = ((u + (v + c as f64)).max(0.0) as u32).min(b - 1);
                 let r_v = ((-u) as u32).min(c - 1);

@@ -1,7 +1,7 @@
 use std::num::NonZero;
-use subsphere::util::validate;
 use subsphere::prelude::*;
-use subsphere::{proj, TriSphere, BaseTriSphere, HexSphere};
+use subsphere::util::validate;
+use subsphere::{BaseTriSphere, HexSphere, TriSphere, proj};
 
 #[test]
 fn test_octasphere() {

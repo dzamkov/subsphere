@@ -294,7 +294,7 @@ fn check_row<Sphere: subsphere::Sphere + Copy>(
 }
 
 /// Indicates whether all vertices of the given face have the same degree.
-/// 
+///
 /// If this is `false`, distortion of the face is expected, so it should not be considered in
 /// quality measurements.
 fn is_face_normal(face: &impl subsphere::Face) -> bool {

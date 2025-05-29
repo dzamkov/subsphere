@@ -103,7 +103,7 @@ impl Camera {
             pos,
             forward,
             extent: [extent_x, extent_y],
-            divergence
+            divergence,
         }
     }
 

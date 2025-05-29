@@ -1,6 +1,6 @@
 //! Contains types related to the [`Fuller`] projection.
-use std::f64::consts::FRAC_PI_3;
 use super::*;
+use std::f64::consts::FRAC_PI_3;
 
 /// The [Fuller](https://en.wikipedia.org/wiki/Dymaxion_map) projection method.
 ///
@@ -36,7 +36,7 @@ impl BaseTriProjector for Fuller {
 pub struct Triangle {
     /// The angle, in radians, between any two endpoints of the triangle.
     angle: f64,
-    
+
     /// The positions of the endpoints of the triangle on the sphere.
     points: [[f64; 3]; 3],
 }
@@ -54,7 +54,7 @@ impl Projection for Triangle {
                     vec::mul(self.points[0], ((1.0 - u) * self.angle).sin()),
                     vec::mul(self.points[1], (u * self.angle).sin()),
                 ))
-            }
+            };
         } else if u <= 0.0 {
             debug_assert_eq!(u, 0.0);
             return vec::normalize(vec::add(
@@ -62,11 +62,11 @@ impl Projection for Triangle {
                 vec::mul(self.points[2], (v * self.angle).sin()),
             ));
         }
-        
+
         // Adapted from "Exact Equations for Fuller’s Map Projection and Inverse"
         // https://utppublishing.com/doi/pdf/10.3138/carto.43.1.67
         // "Inverse with Spherical Linear Interpolation"
-        
+
         // First, solve the equation:
         // `tan(x + proj_u) + tan(x) + tan(x + proj_v) + t_alpha = 0`
         let t_alpha = (self.angle / 2.0).tan();
@@ -84,38 +84,36 @@ impl Projection for Triangle {
             3.0 * den_u * den_v - 8.0 * p - 2.0 * t_alpha * s,
             t_alpha * den_u * den_v + 2.0 * s,
         )
-            .into_iter()
-            .map(|t_x| {
-                // There may be up to three solutions to the cubic equation, but only one
-                // corresponds to the correct projection solution. This is the unique solution
-                // which satisfies:
-                //   * `-self.full_angle / 2.0 <= x <= self.full_angle / 2.0`
-                //   * `-self.full_angle / 2.0 <= x + proj_u <= self.full_angle / 2.0`
-                //   * `-self.full_angle / 2.0 <= x + proj_v <= self.full_angle / 2.0`
-                //
-                // or equivalently:
-                //   * `-t_alpha <= tan(x) <= t_alpha`
-                //   * `-t_alpha <= tan(x + proj_u) <= t_alpha`
-                //   * `-t_alpha <= tan(x + proj_v) <= t_alpha`
-                
-                // Assuming there is exactly one such solution, it will be the one with the
-                // smallest `max(|tan(x)|, |tan(x + proj_u)|, |tan(x + proj_v)|)`
-                let t_x_proj_u =
-                    (den_u + 2.0 * t_half_proj_u) / (den_u - 2.0 * t_x * t_half_proj_u);
-                let t_x_proj_v =
-                    (den_v + 2.0 * t_half_proj_v) / (den_v - 2.0 * t_x * t_half_proj_v);
-                (t_x, t_x.abs().max(t_x_proj_u.abs()).max(t_x_proj_v.abs()))
-            })
-            .min_by(|(_, a), (_, b)| a.abs().partial_cmp(&b.abs()).unwrap())
-            .unwrap();
-        
+        .into_iter()
+        .map(|t_x| {
+            // There may be up to three solutions to the cubic equation, but only one
+            // corresponds to the correct projection solution. This is the unique solution
+            // which satisfies:
+            //   * `-self.full_angle / 2.0 <= x <= self.full_angle / 2.0`
+            //   * `-self.full_angle / 2.0 <= x + proj_u <= self.full_angle / 2.0`
+            //   * `-self.full_angle / 2.0 <= x + proj_v <= self.full_angle / 2.0`
+            //
+            // or equivalently:
+            //   * `-t_alpha <= tan(x) <= t_alpha`
+            //   * `-t_alpha <= tan(x + proj_u) <= t_alpha`
+            //   * `-t_alpha <= tan(x + proj_v) <= t_alpha`
+
+            // Assuming there is exactly one such solution, it will be the one with the
+            // smallest `max(|tan(x)|, |tan(x + proj_u)|, |tan(x + proj_v)|)`
+            let t_x_proj_u = (den_u + 2.0 * t_half_proj_u) / (den_u - 2.0 * t_x * t_half_proj_u);
+            let t_x_proj_v = (den_v + 2.0 * t_half_proj_v) / (den_v - 2.0 * t_x * t_half_proj_v);
+            (t_x, t_x.abs().max(t_x_proj_u.abs()).max(t_x_proj_v.abs()))
+        })
+        .min_by(|(_, a), (_, b)| a.abs().partial_cmp(&b.abs()).unwrap())
+        .unwrap();
+
         let x = t_x.atan();
-        
+
         // Use the solution to compute angle offsets of two planes from the second and
         // third edges of the triangle
         let a_0 = self.angle / 2.0 - x;
         let a_1 = a_0 - (2.0 * u + v - 1.0) * self.angle;
-        
+
         // Construct planes by offsetting the second and third edges of the triangle
         let n_0 = vec::cross(
             mat::apply(
@@ -131,16 +129,16 @@ impl Projection for Triangle {
             ),
             vec::sub(self.points[0], self.points[2]),
         );
-        
+
         // The projected point is the intersection of the two planes
         vec::normalize(vec::cross(n_0, n_1))
     }
-    
+
     fn from_sphere(&self, point: [f64; 3]) -> [f64; 2] {
         // Adapted from "Exact Equations for Fuller’s Map Projection and Inverse"
         // https://utppublishing.com/doi/pdf/10.3138/carto.43.1.67
         // "Transformation Equations with Spherical Linear Interpolation"
-        
+
         let d_0 = mat::det_3([point, self.points[0], self.points[1]]);
         let d_1 = mat::det_3([point, self.points[1], self.points[2]]);
         let d_2 = mat::det_3([point, self.points[2], self.points[0]]);
@@ -152,7 +150,7 @@ impl Projection for Triangle {
         let v = (self.angle + 2.0 * a_0 - a_1 - a_2) / (3.0 * self.angle);
         [u, v]
     }
-    
+
     type Transform = Transform<Self>;
     fn transform(self, offset: [f64; 2], linear: [[f64; 2]; 2]) -> Transform<Self> {
         Transform::new(self, offset, linear)
@@ -196,7 +194,7 @@ fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> impl IntoIterator<Item 
         let j = 2.0 * d;
         let k = 2.0 * b;
         let disc = c * c - j * k;
-        
+
         // The polynomial discriminant will never be negative so we don't need to branch here.
         // TODO: Can we find a proof?
         debug_assert!(disc >= 0.0, "Quadratic discriminant was negative.");
@@ -211,33 +209,38 @@ fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> impl IntoIterator<Item 
         let b2 = b * b;
         let a2 = a * a;
         let ac = a * c;
-        
+
         let p = (3.0 * ac - b2) / (3.0 * a2);
         // If `b` is close to 0, this expression will be very close to `d/a`. In testing this library `|b|` was less
         // than 10^-6 in less than 0.0001% of cases so the branch would cost more performance than it saved.
         let q = (2.0 * b2 * b - 9.0 * ac * b + 27.0 * a2 * d) / (27.0 * a2 * a);
-        
+
         let s = b / (3.0 * a);
-        
+
         // Solve depressed cubic
         // In general, a case to just output the negative cube root of `q` when `p` is close to 0 would improve performance.
         // However, in testing, `|p|` was less than 10^-6 in less than 0.0001% of cases, so branching would cost more than
         // it gained.
-        
+
         // The discriminant will always be negative so we will always have three real roots and don't need to branch here.
         // TODO: Can we find a proof?
-        debug_assert!(4.0 * p * p * p + 27.0 * q * q < 0.0, "Depressed cubic discriminant was not negative.");
+        debug_assert!(
+            4.0 * p * p * p + 27.0 * q * q < 0.0,
+            "Depressed cubic discriminant was not negative."
+        );
         let p_3 = -p / 3.0;
         let k = 2.0 * p_3.sqrt();
         // Absolute value not necessary after pulling p_3*p_3 out of sqrt because p is always negative.
         let theta = (-q / (p_3 * k)).acos() / 3.0;
         const PHI: f64 = 2.0 * FRAC_PI_3;
-        
+
         [
             k * theta.cos() - s,
             k * (theta + PHI).cos() - s,
-            k * (theta + 2.0 * PHI).cos() - s
-        ].into_iter().take(3)
+            k * (theta + 2.0 * PHI).cos() - s,
+        ]
+        .into_iter()
+        .take(3)
     }
 }
 
@@ -245,7 +248,9 @@ fn solve_cubic_fuller(a: f64, b: f64, c: f64, d: f64) -> impl IntoIterator<Item 
 fn test_solve_cubic() {
     // Cubic cases
     assert_similar(
-        solve_cubic_fuller(1.0, 4.0, 0.0, -5.0).into_iter().collect(),
+        solve_cubic_fuller(1.0, 4.0, 0.0, -5.0)
+            .into_iter()
+            .collect(),
         [
             -(5.0f64.sqrt() + 5.0) / 2.0,
             (5.0f64.sqrt() - 5.0) / 2.0,
@@ -253,16 +258,23 @@ fn test_solve_cubic() {
         ],
     );
     assert_similar(
-        solve_cubic_fuller(1.0, -2.0, 0.0, 1.0).into_iter().collect(),
+        solve_cubic_fuller(1.0, -2.0, 0.0, 1.0)
+            .into_iter()
+            .collect(),
         [
             (1.0 - 5.0f64.sqrt()) / 2.0,
             1.0,
             (1.0 + 5.0f64.sqrt()) / 2.0,
         ],
     );
-    
+
     // Quadratic cases
-    assert_similar(solve_cubic_fuller(0.0, 1.0, 0.0, -1.0).into_iter().collect(), [-1.0, 1.0]);
+    assert_similar(
+        solve_cubic_fuller(0.0, 1.0, 0.0, -1.0)
+            .into_iter()
+            .collect(),
+        [-1.0, 1.0],
+    );
 }
 
 #[cfg(test)]
