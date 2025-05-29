@@ -6,7 +6,7 @@ authors = ["Dmitry Zamkov <dmitry94@gmail.com>"]
 description = "Sphere tessellation toolkit"
 repository = "https://github.com/dzamkov/subsphere"
 license = "MIT OR Apache-2.0"
-keywords = ["gamedev", "math", "geometry", "sphere", "tessellation"]
+keywords = ["gamedev", "icosahedron", "hexagon", "sphere", "tessellation"]
 categories = ["mathematics", "data-structures", "graphics"]
 readme = "README.md"
 
