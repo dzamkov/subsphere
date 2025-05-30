@@ -132,27 +132,18 @@ impl Projection for Triangle {
         // Use the solution to compute angle offsets of two planes from the second and
         // third edges of the triangle. Construct planes by offsetting the second and third edges
         // of the triangle
-        let s_alpha = self.sin_half_angle;
-        let c_alpha = self.cos_half_angle;
-        let s_k_proj_u = 2.0 * t_half_proj_u;
-        let c_k_proj_u = 1.0 - t_half_proj_u * t_half_proj_u;
+        let s_0 = self.sin_half_angle;
+        let c_0 = self.cos_half_angle * t_x;
         let n_0 = vec::cross(
-            mat::apply(
-                [self.points[0], self.points[1]],
-                [s_alpha + c_alpha * t_x, s_alpha - c_alpha * t_x],
-            ),
+            mat::apply([self.points[0], self.points[1]], [s_0 + c_0, s_0 - c_0]),
             vec::sub(self.points[2], self.points[1]),
         );
+        let s_k_proj_u = 2.0 * t_half_proj_u;
+        let c_k_proj_u = 1.0 - t_half_proj_u * t_half_proj_u;
+        let s_1 = self.sin_half_angle * (c_k_proj_u - t_x * s_k_proj_u);
+        let c_1 = self.cos_half_angle * (t_x * c_k_proj_u + s_k_proj_u);
         let n_1 = vec::cross(
-            mat::apply(
-                [self.points[1], self.points[2]],
-                [
-                    s_alpha * (c_k_proj_u - t_x * s_k_proj_u)
-                        + c_alpha * (t_x * c_k_proj_u + s_k_proj_u),
-                    s_alpha * (c_k_proj_u - t_x * s_k_proj_u)
-                        - c_alpha * (t_x * c_k_proj_u + s_k_proj_u),
-                ],
-            ),
+            mat::apply([self.points[1], self.points[2]], [s_1 + c_1, s_1 - c_1]),
             vec::sub(self.points[0], self.points[2]),
         );
 
