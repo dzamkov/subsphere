@@ -13,21 +13,34 @@ impl Fuller {
     /// must be equilateral, with the angle between any two endpoints equal to `angle`.
     pub fn triangle(self, angle: f64, points: [[f64; 3]; 3]) -> Triangle {
         // TODO: Validate triangle when debug assertions are on
-        Triangle { angle, points }
+        let sin_half_angle = (angle / 2.0).sin();
+        let cos_half_angle = (angle / 2.0).cos();
+        let tan_half_angle = sin_half_angle / cos_half_angle;
+        Triangle {
+            angle,
+            sin_half_angle,
+            cos_half_angle,
+            tan_half_angle,
+            points,
+        }
     }
 }
 
 impl BaseTriProjector for Fuller {
     type Triangle = Triangle;
     fn inside(&self, edge: basetri::HalfEdge) -> Triangle {
-        self.triangle(
-            edge.sphere().edge_length(),
-            [
+        let consts = edge.sphere().consts();
+        Triangle {
+            angle: consts.angle,
+            sin_half_angle: consts.sin_half_angle,
+            cos_half_angle: consts.cos_half_angle,
+            tan_half_angle: consts.tan_half_angle,
+            points: [
                 edge.start().pos(),
                 edge.next().start().pos(),
                 edge.prev().start().pos(),
             ],
-        )
+        }
     }
 }
 
@@ -36,6 +49,15 @@ impl BaseTriProjector for Fuller {
 pub struct Triangle {
     /// The angle, in radians, between any two endpoints of the triangle.
     angle: f64,
+
+    /// `sin(angle / 2)`
+    sin_half_angle: f64,
+
+    /// `cos(angle / 2)`
+    cos_half_angle: f64,
+
+    /// `tan(angle / 2)`
+    tan_half_angle: f64,
 
     /// The positions of the endpoints of the triangle on the sphere.
     points: [[f64; 3]; 3],
@@ -69,7 +91,7 @@ impl Projection for Triangle {
 
         // First, solve the equation:
         // `tan(x + proj_u) + tan(x) + tan(x + proj_v) + t_alpha = 0`
-        let t_alpha = (self.angle / 2.0).tan();
+        let t_alpha = self.tan_half_angle;
         let proj_u = (2.0 * u + v - 1.0) * self.angle;
         let proj_v = (2.0 * v + u - 1.0) * self.angle;
         let t_half_proj_u = (proj_u / 2.0).tan();
@@ -107,26 +129,21 @@ impl Projection for Triangle {
         .min_by(|(_, a), (_, b)| a.abs().partial_cmp(&b.abs()).unwrap())
         .unwrap();
 
-        let x = t_x.atan();
-
         // Use the solution to compute angle offsets of two planes from the second and
-        // third edges of the triangle
-        let a_0 = self.angle / 2.0 - x;
-        let a_1 = a_0 - (2.0 * u + v - 1.0) * self.angle;
-
-        // Construct planes by offsetting the second and third edges of the triangle
+        // third edges of the triangle. Construct planes by offsetting the second and third edges
+        // of the triangle
+        let s_0 = self.sin_half_angle;
+        let c_0 = self.cos_half_angle * t_x;
         let n_0 = vec::cross(
-            mat::apply(
-                [self.points[0], self.points[1]],
-                [(self.angle - a_0).sin(), a_0.sin()],
-            ),
+            mat::apply([self.points[0], self.points[1]], [s_0 + c_0, s_0 - c_0]),
             vec::sub(self.points[2], self.points[1]),
         );
+        let s_k_proj_u = 2.0 * t_half_proj_u;
+        let c_k_proj_u = 1.0 - t_half_proj_u * t_half_proj_u;
+        let s_1 = self.sin_half_angle * (c_k_proj_u - t_x * s_k_proj_u);
+        let c_1 = self.cos_half_angle * (t_x * c_k_proj_u + s_k_proj_u);
         let n_1 = vec::cross(
-            mat::apply(
-                [self.points[1], self.points[2]],
-                [(self.angle - a_1).sin(), a_1.sin()],
-            ),
+            mat::apply([self.points[1], self.points[2]], [s_1 + c_1, s_1 - c_1]),
             vec::sub(self.points[0], self.points[2]),
         );
 
