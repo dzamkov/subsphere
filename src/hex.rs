@@ -171,8 +171,70 @@ impl<Proj: Eq + Clone + BaseTriProjector> crate::Sphere for HexSphere<Proj> {
     }
 
     fn face(&self, index: usize) -> Face<Proj> {
-        // TODO: "Real" implementation with constant-time performance
-        self.faces().nth(index).expect("face index out of bounds")
+        assert!(index < self.num_faces(), "face index out of bounds");
+        let first = self.kis.base().first_region();
+        let mut region = first;
+        let mut local = index;
+        loop {
+            let count = if region.ty().is_edge() {
+                self.num_faces_per_edge_region()
+                    + (region.ty() == BaseRegionType::EDGE_0 && region.owner().owns_vertex_1())
+                        as usize
+            } else {
+                self.num_faces_per_interior_region()
+            } + (region == first) as usize;
+            if local < count {
+                break;
+            }
+            local -= count;
+            region = self.kis.base().next_region(region).unwrap();
+        }
+
+        if region == first {
+            if local == 0 {
+                return Face::from_center_unchecked(tri::Vertex::new(
+                    self.kis.clone(),
+                    region,
+                    0,
+                    0,
+                ));
+            }
+            local -= 1;
+        }
+
+        let (u, v) = if region.ty().is_edge() {
+            if local == self.num_faces_per_edge_region() {
+                (self.kis.b(), self.kis.c())
+            } else {
+                let b = self.kis.b() as usize;
+                let target = local + 1;
+                let rows = (3 * target - (b % 3) / 2).div_ceil(b - 1);
+                let v = rows - 1;
+                let within = target - num_faces_on_edge(b, v);
+                ((3 * within - (3 - v % 3) % 3) as u32, v as u32)
+            }
+        } else if self.kis.b() == self.kis.c() {
+            (0, 0)
+        } else {
+            let c = self.kis.c() as usize;
+            let n = (self.kis.b() - self.kis.c()) as usize;
+            let target = local + 1;
+            // Write t = v - 1 and m = 2*n - 3. The prefix count is
+            // ceil(t*(m-t)/6) when c % 3 == 0, and floor otherwise.
+            // Find the last row whose prefix count is <= local. This is the
+            // quadratic inversion used for packed triangular indexing, adjusted
+            // for the one-in-three lattice spacing. Use u64 for the discriminant:
+            // m*m can exceed usize on 32-bit targets even when face counts fit.
+            let m = 2 * n as u64 - 3;
+            let limit = 6 * local as u64 + if c % 3 == 0 { 0 } else { 5 };
+            let discriminant = m * m - 4 * limit;
+            // Valid local indices give D >= 9 (ceil case) or D >= 13 (floor).
+            // ceil(sqrt(D)) = 1 + isqrt(D - 1), so no row correction is needed.
+            let v = ((m - 1 - (discriminant - 1).isqrt()) / 2 + 1) as usize;
+            let within = target - num_faces_on_interior(c, n, v);
+            ((3 * within - (3 - (v + c) % 3) % 3) as u32, v as u32)
+        };
+        Face::from_center_unchecked(tri::Vertex::new(self.kis.clone(), region, u, v))
     }
 
     fn faces(&self) -> impl Iterator<Item = Face<Proj>> {
@@ -631,6 +693,110 @@ impl<Proj: Eq + Clone + BaseTriProjector> Iterator for FaceIter<Proj> {
                 return None;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn check_face_lookup<Proj: Eq + Clone + BaseTriProjector + std::fmt::Debug>(
+        sphere: HexSphere<Proj>,
+    ) {
+        for (index, face) in sphere.faces().enumerate() {
+            assert_eq!(sphere.face(index), face, "index {index} in {sphere:?}");
+            assert_eq!(face.index(), index);
+        }
+    }
+
+    #[test]
+    fn face_lookup_matches_iteration() {
+        for base in [crate::BaseTriSphere::Icosa, crate::BaseTriSphere::Octa] {
+            for b in 1..=24 {
+                for c in (0..=b).filter(|c| b % 3 == c % 3) {
+                    let sphere = HexSphere::from_kis(TriSphere::new(
+                        base,
+                        proj::Gnomonic,
+                        NonZero::new(b).unwrap(),
+                        c,
+                    ))
+                    .unwrap();
+                    check_face_lookup(sphere);
+                    check_face_lookup(sphere.with_projector(proj::Fuller));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn face_lookup_matches_large_row_boundaries() {
+        for base in [crate::BaseTriSphere::Icosa, crate::BaseTriSphere::Octa] {
+            for (b, c) in [(1332, 0), (1333, 1), (1334, 2), (1332, 666)] {
+                let sphere = HexSphere::from_kis(TriSphere::new(
+                    base,
+                    proj::Fuller,
+                    NonZero::new(b).unwrap(),
+                    c,
+                ))
+                .unwrap();
+                let n = b - c;
+                let mut region = Some(base.first_region());
+                while let Some(current) = region {
+                    if !current.ty().is_edge() {
+                        for v in [1, 2, 3, n / 2, n - 3, n - 2, n - 1] {
+                            let first = 1 + (v + c + 2) % 3;
+                            if first < n - v {
+                                let last = first + 3 * ((n - v - 1 - first) / 3);
+                                for u in [first, last] {
+                                    let face = Face::from_center_unchecked(tri::Vertex {
+                                        sphere: sphere.kis,
+                                        region: current,
+                                        u,
+                                        v,
+                                    });
+                                    assert_eq!(sphere.face(face.index()), face);
+                                }
+                            }
+                        }
+                    }
+                    region = base.next_region(current);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn face_lookup_handles_discriminants_larger_than_u32() {
+        // Both counts fit in u32 (about 1.43 billion faces, 2.86 billion
+        // vertices), but the interior discriminant's m*m does not.
+        let sphere = HexSphere::from_kis(TriSphere::new(
+            crate::BaseTriSphere::Octa,
+            proj::Gnomonic,
+            NonZero::new(32772).unwrap(),
+            0,
+        ))
+        .unwrap();
+        // Compare early interior faces directly with the iterator as well as
+        // checking distant indices without traversing the whole sphere.
+        for (index, face) in sphere.faces().enumerate().take(10930).skip(10924) {
+            assert_eq!(sphere.face(index), face);
+        }
+        for index in [sphere.num_faces() / 2, sphere.num_faces() - 1] {
+            assert_eq!(sphere.face(index).index(), index);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "face index out of bounds")]
+    fn face_lookup_rejects_past_end() {
+        let sphere = crate::icosphere().truncate();
+        sphere.face(sphere.num_faces());
+    }
+
+    #[test]
+    #[should_panic(expected = "face index out of bounds")]
+    fn face_lookup_rejects_max_index() {
+        crate::icosphere().truncate().face(usize::MAX);
     }
 }
 
